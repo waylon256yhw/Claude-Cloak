@@ -6,6 +6,7 @@ import type {
   ClaudeSystemBlock,
 } from '../types.js'
 import { generateFakeUserId, isValidUserId } from './user.js'
+import { settingsManager } from '../settings/manager.js'
 
 const CLAUDE_CODE_SYSTEM_PROMPT: ClaudeSystemBlock = {
   type: 'text',
@@ -21,16 +22,21 @@ export function convertOpenAIToClaude(request: OpenAIChatRequest): ClaudeRequest
     stream = false,
   } = request
 
-  const systemMessages = messages.filter((m) => m.role === 'system')
   const conversationMessages = messages.filter((m) => m.role !== 'system')
 
-  const system: ClaudeSystemBlock[] = [
-    CLAUDE_CODE_SYSTEM_PROMPT,
-    ...systemMessages.map((m) => ({
-      type: 'text' as const,
-      text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
-    })),
-  ]
+  let system: ClaudeSystemBlock[]
+  if (settingsManager.isStrictMode()) {
+    system = [CLAUDE_CODE_SYSTEM_PROMPT]
+  } else {
+    const systemMessages = messages.filter((m) => m.role === 'system')
+    system = [
+      CLAUDE_CODE_SYSTEM_PROMPT,
+      ...systemMessages.map((m) => ({
+        type: 'text' as const,
+        text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+      })),
+    ]
+  }
 
   const claudeMessages: ClaudeMessage[] = conversationMessages.map((msg) => ({
     role: msg.role as 'user' | 'assistant',
@@ -59,7 +65,9 @@ export function convertOpenAIToClaude(request: OpenAIChatRequest): ClaudeRequest
 export function enhanceAnthropicRequest(request: ClaudeRequest): ClaudeRequest {
   const enhanced = { ...request }
 
-  if (!enhanced.system || enhanced.system.length === 0) {
+  if (settingsManager.isStrictMode()) {
+    enhanced.system = [CLAUDE_CODE_SYSTEM_PROMPT]
+  } else if (!enhanced.system || enhanced.system.length === 0) {
     enhanced.system = [CLAUDE_CODE_SYSTEM_PROMPT]
   } else {
     const existingSystem = Array.isArray(enhanced.system)

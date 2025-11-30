@@ -40,11 +40,13 @@ const els = {
 document.addEventListener('DOMContentLoaded', () => {
     updateThemeButton();
     document.getElementById('btnTheme')?.addEventListener('click', toggleTheme);
+    document.getElementById('strictModeToggle')?.addEventListener('change', toggleStrictMode);
 
     if (!proxyKey) {
         showAuthModal();
     } else {
         loadCredentials();
+        loadSettings();
         checkStatus();
     }
 });
@@ -125,6 +127,26 @@ async function checkStatus() {
     }
 }
 
+async function loadSettings() {
+    try {
+        const settings = await api('/settings');
+        const toggle = document.getElementById('strictModeToggle');
+        if (toggle) toggle.checked = settings.strictMode;
+    } catch (e) {
+        console.error('Failed to load settings:', e);
+    }
+}
+
+async function toggleStrictMode(e) {
+    const enabled = e.target.checked;
+    try {
+        await api('/settings', { method: 'PUT', body: JSON.stringify({ strictMode: enabled }) });
+        showToast(`Strict Mode ${enabled ? 'enabled' : 'disabled'}`, 'success');
+    } catch (err) {
+        e.target.checked = !enabled;
+    }
+}
+
 function renderList() {
     if (credentials.length === 0) {
         els.list.innerHTML = `
@@ -163,6 +185,7 @@ els.authForm.addEventListener('submit', (e) => {
         localStorage.setItem('claude_proxy_key', key);
         els.authModal.classList.add('hidden');
         loadCredentials();
+        loadSettings();
         checkStatus();
     }
 });

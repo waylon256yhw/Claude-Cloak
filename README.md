@@ -10,6 +10,9 @@ A lightweight reverse proxy that cloaks various Claude API requests as Claude Co
 - **System Prompt Injection**: Automatically injects Claude Code identity
 - **Stealth Headers**: Mimics authentic Claude CLI request headers
 - **SSE Streaming**: Full support for streaming responses
+- **Multi-Credential Management**: Store multiple upstream API credentials, switch at runtime
+- **Strict Mode**: Strip all user system messages, keep only Claude Code prompt
+- **Admin Panel**: Web UI for credential and settings management
 - **Docker Ready**: One-command deployment with Docker Compose
 
 ## Quick Start
@@ -36,41 +39,22 @@ API_KEY=your-upstream-api-key          # Key for upstream API
 PROXY_KEY=your-custom-key              # Key for client authentication
 REQUEST_TIMEOUT=60000                  # Request timeout in ms
 LOG_LEVEL=info                         # Log level: debug, info, warn, error
+STRICT_MODE=false                      # Strip all user system messages (default: false)
 ```
 
 ## ⚠️ Important Limitations
 
-**Do NOT include `system` role messages in your requests!**
+**Avoid `system` role messages in your requests!**
 
-Claude Cloak automatically injects Claude Code system prompts. If you include additional `system` messages, it may trigger upstream detection mechanisms that inspect system prompts, potentially exposing the cloaking.
+Claude Cloak automatically injects Claude Code system prompts. Additional `system` messages may trigger upstream detection.
 
-❌ **Bad - Will trigger detection:**
-```json
-{
-  "messages": [
-    {"role": "system", "content": "You are a helpful assistant"},
-    {"role": "user", "content": "Hello"}
-  ]
-}
-```
+**Solution: Enable Strict Mode** to automatically strip all user system messages:
+- Set `STRICT_MODE=true` in `.env`, or
+- Toggle in Admin Panel (`/admin/`)
 
-✅ **Good - Safe to use:**
-```json
-{
-  "messages": [
-    {"role": "user", "content": "Hello"}
-  ]
-}
-```
+With Strict Mode **disabled** (default), user system messages are preserved but prepended with Claude Code prompt.
 
-**Workaround**: If you need to provide instructions, include them in the first user message instead:
-```json
-{
-  "messages": [
-    {"role": "user", "content": "You are a helpful assistant.\n\nUser question: Hello"}
-  ]
-}
-```
+With Strict Mode **enabled**, all user system messages are stripped, keeping only the Claude Code identity.
 
 ## API Usage
 
@@ -122,6 +106,16 @@ curl -X POST https://your-domain/v1/messages \
 | GET | `/v1/models` | List available models |
 | POST | `/v1/messages` | Anthropic format |
 | POST | `/v1/chat/completions` | OpenAI format |
+| GET | `/admin/` | Admin Panel (Web UI) |
+
+## Admin Panel
+
+Access the web-based admin panel at `/admin/` to:
+- **Manage Credentials**: Add, edit, delete, and switch between multiple upstream API credentials
+- **Toggle Strict Mode**: Enable/disable system message stripping at runtime
+- **Monitor Status**: View proxy health status
+
+Authentication uses `PROXY_KEY` from your configuration.
 
 ## Authentication
 
@@ -164,13 +158,25 @@ claude-cloak/
 │   ├── routes/
 │   │   ├── health.ts       # Health endpoints
 │   │   ├── models.ts       # Models endpoint
-│   │   └── proxy.ts        # Main proxy logic
-│   └── services/
-│       ├── auth.ts         # Authentication
-│       ├── headers.ts      # Stealth headers
-│       ├── transform.ts    # Format conversion
-│       ├── stream.ts       # SSE handling
-│       └── user.ts         # User ID generation
+│   │   ├── proxy.ts        # Main proxy logic
+│   │   └── admin.ts        # Admin API routes
+│   ├── services/
+│   │   ├── auth.ts         # Authentication
+│   │   ├── headers.ts      # Stealth headers
+│   │   ├── transform.ts    # Format conversion
+│   │   ├── stream.ts       # SSE handling
+│   │   └── user.ts         # User ID generation
+│   ├── credentials/
+│   │   ├── manager.ts      # Credential CRUD operations
+│   │   ├── storage.ts      # JSON file persistence
+│   │   └── types.ts        # Credential types
+│   └── settings/
+│       └── manager.ts      # Runtime settings (Strict Mode)
+├── public/                 # Admin Panel frontend
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
+├── data/                   # Persistent storage (Docker volume)
 ├── Dockerfile
 ├── docker-compose.yml
 └── .env.example

@@ -147,3 +147,56 @@ input:focus { outline: 2px solid var(--primary); border-color: transparent; }
 .toast.success { border-color: var(--success); }
 .toast.error { border-color: var(--danger); }
 @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+.settings-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.5rem;
+    box-shadow: var(--shadow);
+}
+
+.setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.setting-info { flex: 1; }
+.setting-label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
+.setting-desc { font-size: 0.85rem; color: var(--text-muted); }
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--border);
+    border-radius: 28px;
+    transition: 0.3s;
+}
+
+.toggle-slider::before {
+    content: "";
+    position: absolute;
+    height: 22px;
+    width: 22px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.3s;
+}
+
+.toggle-switch input:checked + .toggle-slider { background: var(--success); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(22px); }

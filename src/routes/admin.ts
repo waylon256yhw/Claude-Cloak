@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import type { Config } from '../types.js'
 import { credentialManager } from '../credentials/manager.js'
 import type { CreateCredentialInput, UpdateCredentialInput } from '../credentials/types.js'
+import { settingsManager, type Settings } from '../settings/manager.js'
 
 interface IdParams {
   id: string
@@ -90,5 +91,22 @@ export async function adminRoutes(fastify: FastifyInstance, config: Config) {
       return
     }
     return { id: active.id, name: active.name, targetUrl: active.targetUrl }
+  })
+
+  fastify.get('/settings', async () => {
+    return settingsManager.getAll()
+  })
+
+  fastify.put<{ Body: Partial<Settings> }>('/settings', async (request, reply) => {
+    const { strictMode } = request.body || {}
+    if (strictMode !== undefined && typeof strictMode !== 'boolean') {
+      reply.code(400).send({ error: 'Bad Request', message: 'strictMode must be boolean' })
+      return
+    }
+    try {
+      return settingsManager.update(request.body || {})
+    } catch (err) {
+      reply.code(400).send({ error: 'Bad Request', message: (err as Error).message })
+    }
   })
 }

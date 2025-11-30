@@ -31,6 +31,22 @@
                     <button id="btnAdd" class="btn btn-primary">+ Add Credential</button>
                 </div>
                 <div id="credentialList" class="card-grid"></div>
+
+                <div class="section-header" style="margin-top: 2rem;">
+                    <h2>Settings</h2>
+                </div>
+                <div class="settings-card">
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <span class="setting-label">Strict Mode</span>
+                            <span class="setting-desc">Strip all user system messages, keep only Claude Code prompt</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="strictModeToggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
             </div>
         </main>
 
@@ -80,6 +96,6 @@
 
         <div id="toastContainer" class="toast-container"></div>
     </div>
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>
