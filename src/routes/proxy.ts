@@ -3,6 +3,23 @@ import type { Config, OpenAIChatRequest, ClaudeRequest } from '../types.js'
 import { buildStealthHeaders } from '../services/headers.js'
 import { convertOpenAIToClaude, enhanceAnthropicRequest } from '../services/transform.js'
 import { pipeStream } from '../services/stream.js'
+import { credentialManager } from '../credentials/manager.js'
+
+interface UpstreamConfig {
+  targetUrl: string
+  apiKey: string
+}
+
+function getUpstreamConfig(config: Config): UpstreamConfig {
+  const active = credentialManager.getActive()
+  if (active) {
+    return { targetUrl: active.targetUrl, apiKey: active.apiKey }
+  }
+  if (config.targetUrl && config.apiKey) {
+    return { targetUrl: config.targetUrl, apiKey: config.apiKey }
+  }
+  throw new Error('No upstream credential configured')
+}
 
 export async function proxyRoutes(fastify: FastifyInstance, config: Config) {
   fastify.post('/v1/chat/completions', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -24,8 +41,16 @@ async function proxyToClaude(
   request: FastifyRequest,
   reply: FastifyReply
 ) {
+  let upstream: UpstreamConfig
+  try {
+    upstream = getUpstreamConfig(config)
+  } catch (err) {
+    reply.code(503).send({ error: 'Service Unavailable', message: (err as Error).message })
+    return
+  }
+
   const isStream = body.stream === true
-  const headers = buildStealthHeaders(config.apiKey, isStream)
+  const headers = buildStealthHeaders(upstream.apiKey, isStream)
   const controller = new AbortController()
 
   request.raw.on('close', () => controller.abort())
@@ -33,7 +58,7 @@ async function proxyToClaude(
   const timeoutId = setTimeout(() => controller.abort(), config.requestTimeout)
 
   try {
-    const response = await fetch(`${config.targetUrl}/v1/messages`, {
+    const response = await fetch(`${upstream.targetUrl}/v1/messages`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),

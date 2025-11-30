@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Cloak - Admin</title>
+    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+</head>
+<body>
+    <div id="app">
+        <header class="app-header">
+            <div class="logo-section">
+                <span class="icon">🛡️</span>
+                <h1>Claude Cloak</h1>
+            </div>
+            <div class="header-actions">
+                <div class="status-indicator" id="globalStatus">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Checking...</span>
+                </div>
+                <button id="btnTheme" class="btn btn-sm btn-secondary" title="Toggle theme">🌙</button>
+                <button id="btnLogout" class="btn btn-sm btn-secondary">Logout</button>
+            </div>
+        </header>
+
+        <main>
+            <div class="container">
+                <div class="section-header">
+                    <h2>API Credentials</h2>
+                    <button id="btnAdd" class="btn btn-primary">+ Add Credential</button>
+                </div>
+                <div id="credentialList" class="card-grid"></div>
+            </div>
+        </main>
+
+        <div id="modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalTitle">Add Credential</h3>
+                    <button class="btn-close" id="btnModalClose">&times;</button>
+                </div>
+                <form id="credentialForm">
+                    <input type="hidden" id="editId">
+                    <div class="form-group">
+                        <label for="name">Name</label>
+                        <input type="text" id="name" required placeholder="e.g., Production API">
+                    </div>
+                    <div class="form-group">
+                        <label for="targetUrl">Target URL</label>
+                        <input type="url" id="targetUrl" required placeholder="https://api.anthropic.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="apiKey">API Key</label>
+                        <div class="input-group">
+                            <input type="password" id="apiKey" required placeholder="sk-ant-...">
+                            <button type="button" class="btn-icon toggle-visibility" tabindex="-1">👁️</button>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" id="btnCancel">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="authModal" class="modal">
+            <div class="modal-content compact">
+                <h3>Admin Access</h3>
+                <p class="text-muted">Enter your Proxy Key to continue.</p>
+                <form id="authForm">
+                    <div class="form-group">
+                        <input type="password" id="proxyKeyInput" required placeholder="Proxy Key">
+                    </div>
+                    <button type="submit" class="btn btn-primary full-width">Login</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="toastContainer" class="toast-container"></div>
+    </div>
+    <script src="app.js?v=3"></script>
+</body>
+</html>

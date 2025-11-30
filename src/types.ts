@@ -1,7 +1,7 @@
 export interface Config {
   port: number
-  targetUrl: string
-  apiKey: string
+  targetUrl: string | null
+  apiKey: string | null
   proxyKey: string
   requestTimeout: number
   logLevel: string

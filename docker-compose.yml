@@ -5,6 +5,8 @@ services:
     env_file: .env
     ports:
       - "${PORT:-4000}:${PORT:-4000}"
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:${PORT:-4000}/healthz"]

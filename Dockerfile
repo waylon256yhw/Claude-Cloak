@@ -13,6 +13,8 @@ RUN apk add --no-cache wget && chown -R node:node /app
 COPY --chown=node:node package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --chown=node:node --from=builder /app/dist ./dist
+COPY --chown=node:node public ./public
+RUN mkdir -p data && chown node:node data
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \

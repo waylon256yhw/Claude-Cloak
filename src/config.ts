@@ -11,8 +11,8 @@ function requireEnv(name: string): string {
 export function loadConfig(): Config {
   return {
     port: parseInt(process.env.PORT || '3000', 10),
-    targetUrl: requireEnv('TARGET_URL'),
-    apiKey: requireEnv('API_KEY'),
+    targetUrl: process.env.TARGET_URL || null,
+    apiKey: process.env.API_KEY || null,
     proxyKey: requireEnv('PROXY_KEY'),
     requestTimeout: parseInt(process.env.REQUEST_TIMEOUT || '60000', 10),
     logLevel: process.env.LOG_LEVEL || 'info',
