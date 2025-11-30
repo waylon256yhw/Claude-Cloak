@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claude Cloak - Admin</title>
-    <link rel="stylesheet" href="styles.css?v=10">
+    <link rel="stylesheet" href="styles.css?v=11">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22 fill=%22%230d9488%22><path d=%22M50 8C27 8 10 27 10 52V90L50 73L90 90V52C90 27 73 8 50 8Z%22/></svg>">
 </head>
 <body>
@@ -116,8 +116,20 @@
         </div>
 
 
+        <div id="confirmModal" class="modal hidden">
+            <div class="modal-content compact">
+                <div class="confirm-icon" id="confirmIcon"></div>
+                <h3 id="confirmTitle">Confirm</h3>
+                <p id="confirmMessage"></p>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="confirmCancel">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmOk">Confirm</button>
+                </div>
+            </div>
+        </div>
+
         <div id="toastContainer" class="toast-container"></div>
     </div>
-    <script src="app.js?v=10"></script>
+    <script src="app.js?v=11"></script>
 </body>
 </html>

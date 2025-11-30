@@ -7,7 +7,9 @@ const icons = {
     pulse: `<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="currentColor"/><path d="M10 2V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 15V18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 10L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 10L2 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
     power: `<svg viewBox="0 0 20 20" fill="none"><path d="M10 3V9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 5.5C16.5 7 18 9.5 18 12C18 15.5 14.5 18 10 18C5.5 18 2 15.5 2 12C2 9.5 3.5 7 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
     faders: `<svg viewBox="0 0 20 20" fill="none"><path d="M4 4V16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 4V16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 4V16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="2" y="11" width="4" height="2" rx="1" fill="currentColor"/><rect x="8" y="6" width="4" height="2" rx="1" fill="currentColor"/><rect x="14" y="13" width="4" height="2" rx="1" fill="currentColor"/></svg>`,
-    disconnect: `<svg viewBox="0 0 20 20" fill="none"><circle cx="6" cy="10" r="3" stroke="currentColor" stroke-width="2"/><circle cx="14" cy="10" r="3" stroke="currentColor" stroke-width="2"/><path d="M9 10H11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 2"/></svg>`
+    disconnect: `<svg viewBox="0 0 20 20" fill="none"><circle cx="6" cy="10" r="3" stroke="currentColor" stroke-width="2"/><circle cx="14" cy="10" r="3" stroke="currentColor" stroke-width="2"/><path d="M9 10H11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 2"/></svg>`,
+    warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+    trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>`
 };
 
 // Theme
@@ -88,7 +90,13 @@ async function saveCredential(data) {
 }
 
 async function deleteCredential(id) {
-    if (!confirm('Are you sure you want to delete this credential?')) return;
+    const confirmed = await showConfirm({
+        title: 'Delete Credential',
+        message: 'This action cannot be undone. Are you sure?',
+        icon: 'trash',
+        danger: true
+    });
+    if (!confirmed) return;
     try {
         await api(`/credentials/${id}`, { method: 'DELETE' });
         showToast('Credential deleted', 'success');
@@ -99,7 +107,12 @@ async function deleteCredential(id) {
 async function activateCredential(id) {
     const cred = credentials.find(c => c.id === id);
     if (!cred) return;
-    if (!confirm(`Switch active credential to '${cred.name}'?\n\nOngoing requests will continue with current credential.`)) return;
+    const confirmed = await showConfirm({
+        title: 'Switch Credential',
+        message: `Activate "${cred.name}" as the primary credential?`,
+        icon: 'power'
+    });
+    if (!confirmed) return;
     try {
         await api(`/credentials/${id}/activate`, { method: 'POST' });
         showToast('Active credential switched', 'success');
@@ -222,6 +235,32 @@ function showToast(msg, type = 'info') {
     toast.textContent = msg;
     els.toastContainer.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
+}
+
+function showConfirm({ title, message, icon = 'warning', danger = false }) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        const iconEl = document.getElementById('confirmIcon');
+        const okBtn = document.getElementById('confirmOk');
+
+        document.getElementById('confirmTitle').textContent = title;
+        document.getElementById('confirmMessage').textContent = message;
+        iconEl.className = `confirm-icon ${danger ? 'danger' : 'warning'}`;
+        iconEl.innerHTML = icons[icon] || icons.warning;
+        okBtn.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
+
+        modal.classList.remove('hidden');
+
+        const cleanup = (result) => {
+            modal.classList.add('hidden');
+            document.getElementById('confirmOk').onclick = null;
+            document.getElementById('confirmCancel').onclick = null;
+            resolve(result);
+        };
+
+        document.getElementById('confirmOk').onclick = () => cleanup(true);
+        document.getElementById('confirmCancel').onclick = () => cleanup(false);
+    });
 }
 
 const esc = (str) => str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
