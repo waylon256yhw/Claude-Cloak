@@ -30,6 +30,29 @@ docker compose up -d
 curl http://localhost:4000/healthz
 ```
 
+## Verified Clients
+
+Tested and verified with these frontends:
+
+<table>
+  <tr>
+    <td align="center" width="200">
+      <a href="https://github.com/CherryHQ/cherry-studio">
+        <img src="https://github.com/CherryHQ/cherry-studio/raw/main/build/icon.png" width="64" height="64" alt="Cherry Studio"/><br/>
+        <b>Cherry Studio</b>
+      </a><br/>
+      <sub>OpenAI Format</sub>
+    </td>
+    <td align="center" width="200">
+      <a href="https://github.com/SillyTavern/SillyTavern">
+        <img src="https://github.com/SillyTavern/SillyTavern/raw/release/public/img/ai4.png" width="64" height="64" alt="SillyTavern"/><br/>
+        <b>SillyTavern</b>
+      </a><br/>
+      <sub>OpenAI / Claude Format</sub>
+    </td>
+  </tr>
+</table>
+
 ## Configuration
 
 ```env
