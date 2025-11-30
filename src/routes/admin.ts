@@ -8,15 +8,7 @@ interface IdParams {
   id: string
 }
 
-export async function adminRoutes(fastify: FastifyInstance, config: Config) {
-  fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
-    const auth = request.headers.authorization
-    const key = auth?.startsWith('Bearer ') ? auth.slice(7) : request.headers['x-api-key']
-    if (key !== config.proxyKey) {
-      reply.code(401).send({ error: 'Unauthorized', message: 'Invalid admin key' })
-      return reply
-    }
-  })
+export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
 
   fastify.get('/credentials', async () => {
     return credentialManager.getAll()

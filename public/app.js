@@ -1,7 +1,14 @@
 const API_BASE = '/admin/api';
 
 let credentials = [];
-let proxyKey = localStorage.getItem('claude_proxy_key') || '';
+
+// SVG Icons
+const icons = {
+    pulse: `<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="currentColor"/><path d="M10 2V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 15V18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 10L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 10L2 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+    power: `<svg viewBox="0 0 20 20" fill="none"><path d="M10 3V9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 5.5C16.5 7 18 9.5 18 12C18 15.5 14.5 18 10 18C5.5 18 2 15.5 2 12C2 9.5 3.5 7 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+    faders: `<svg viewBox="0 0 20 20" fill="none"><path d="M4 4V16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 4V16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 4V16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="2" y="11" width="4" height="2" rx="1" fill="currentColor"/><rect x="8" y="6" width="4" height="2" rx="1" fill="currentColor"/><rect x="14" y="13" width="4" height="2" rx="1" fill="currentColor"/></svg>`,
+    disconnect: `<svg viewBox="0 0 20 20" fill="none"><circle cx="6" cy="10" r="3" stroke="currentColor" stroke-width="2"/><circle cx="14" cy="10" r="3" stroke="currentColor" stroke-width="2"/><path d="M9 10H11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 2"/></svg>`
+};
 
 // Theme
 const savedTheme = localStorage.getItem('claude_theme');
@@ -29,42 +36,28 @@ function updateThemeButton() {
 const els = {
     list: document.getElementById('credentialList'),
     modal: document.getElementById('modal'),
-    authModal: document.getElementById('authModal'),
     form: document.getElementById('credentialForm'),
-    authForm: document.getElementById('authForm'),
     status: document.getElementById('globalStatus'),
-    toastContainer: document.getElementById('toastContainer'),
-    btnLogout: document.getElementById('btnLogout')
+    toastContainer: document.getElementById('toastContainer')
 };
 
 document.addEventListener('DOMContentLoaded', () => {
     updateThemeButton();
     document.getElementById('btnTheme')?.addEventListener('click', toggleTheme);
     document.getElementById('strictModeToggle')?.addEventListener('change', toggleStrictMode);
-
-    if (!proxyKey) {
-        showAuthModal();
-    } else {
-        loadCredentials();
-        loadSettings();
-        checkStatus();
-    }
+    document.getElementById('quickGuideToggle')?.addEventListener('click', () => {
+        document.getElementById('quickGuideCard').classList.toggle('collapsed');
+    });
+    loadCredentials();
+    loadSettings();
+    checkStatus();
 });
 
 const api = async (endpoint, options = {}) => {
-    const headers = {
-        'Authorization': `Bearer ${proxyKey}`,
-        ...options.headers
-    };
-    if (options.body) {
-        headers['Content-Type'] = 'application/json';
-    }
+    const headers = { ...options.headers };
+    if (options.body) headers['Content-Type'] = 'application/json';
     try {
         const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
-        if (res.status === 401) {
-            logout();
-            throw new Error('Unauthorized. Please login again.');
-        }
         if (!res.ok) throw new Error((await res.json()).message || 'Request failed');
         return await res.json();
     } catch (err) {
@@ -164,38 +157,25 @@ function renderList() {
         <div class="card ${cred.isActive ? 'active' : ''}">
             <div class="card-header">
                 <span class="card-title">${esc(cred.name)}</span>
-                <span class="badge ${cred.isActive ? 'active' : 'inactive'}">${cred.isActive ? 'Active' : 'Standby'}</span>
+                <span class="status-badge ${cred.isActive ? 'active' : ''}" title="${cred.isActive ? 'Active' : 'Standby'}">${icons.pulse}</span>
             </div>
             <div class="card-details">
-                <div class="detail-row"><span>Target</span><span class="code">${esc(cred.targetUrl)}</span></div>
+                <div class="detail-row"><span>Target</span><span class="code" title="${esc(cred.targetUrl)}">${esc(cred.targetUrl)}</span></div>
                 <div class="detail-row"><span>Key</span><span class="code">${cred.apiKey.length > 8 ? '...' + cred.apiKey.slice(-4) : '****'}</span></div>
             </div>
             <div class="card-actions">
-                ${!cred.isActive ? `<button class="btn btn-sm btn-secondary" onclick="activateCredential('${cred.id}')">Activate</button>` : '<button class="btn btn-sm btn-secondary" disabled>Selected</button>'}
-                <button class="btn btn-sm btn-secondary" onclick="editCredential('${cred.id}')">Edit</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteCredential('${cred.id}')">Delete</button>
+                ${!cred.isActive ? `<button class="btn-icon" onclick="activateCredential('${cred.id}')" title="Activate">${icons.power}</button>` : ''}
+                <button class="btn-icon" onclick="editCredential('${cred.id}')" title="Edit">${icons.faders}</button>
+                <button class="btn-icon btn-icon-danger" onclick="deleteCredential('${cred.id}')" title="Delete">${icons.disconnect}</button>
             </div>
         </div>
     `).join('');
 }
 
-els.authForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const key = document.getElementById('proxyKeyInput').value;
-    if (key) {
-        proxyKey = key;
-        localStorage.setItem('claude_proxy_key', key);
-        els.authModal.classList.add('hidden');
-        loadCredentials();
-        loadSettings();
-        checkStatus();
-    }
-});
 
 document.getElementById('btnAdd').addEventListener('click', () => openModal());
 document.getElementById('btnModalClose').addEventListener('click', closeModal);
 document.getElementById('btnCancel').addEventListener('click', closeModal);
-els.btnLogout.addEventListener('click', logout);
 
 els.form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -235,15 +215,6 @@ function closeModal() {
     els.form.reset();
 }
 
-function showAuthModal() {
-    els.authModal.classList.remove('hidden');
-}
-
-function logout() {
-    localStorage.removeItem('claude_proxy_key');
-    proxyKey = '';
-    location.reload();
-}
 
 function showToast(msg, type = 'info') {
     const toast = document.createElement('div');

@@ -4,28 +4,62 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claude Cloak - Admin</title>
-    <link rel="stylesheet" href="styles.css?v=3">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+    <link rel="stylesheet" href="styles.css?v=10">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22 fill=%22%230d9488%22><path d=%22M50 8C27 8 10 27 10 52V90L50 73L90 90V52C90 27 73 8 50 8Z%22/></svg>">
 </head>
 <body>
     <div id="app">
         <header class="app-header">
-            <div class="logo-section">
-                <span class="icon">🛡️</span>
-                <h1>Claude Cloak</h1>
-            </div>
-            <div class="header-actions">
-                <div class="status-indicator" id="globalStatus">
-                    <span class="status-dot"></span>
-                    <span class="status-text">Checking...</span>
+            <div class="header-content">
+                <div class="logo-section">
+                    <svg class="logo-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.5 2 2.5 6.5 2.5 12.5V21.5L12 17.5L21.5 21.5V12.5C21.5 6.5 17.5 2 12 2Z"/>
+                    </svg>
+                    <h1>Claude Cloak</h1>
                 </div>
-                <button id="btnTheme" class="btn btn-sm btn-secondary" title="Toggle theme">🌙</button>
-                <button id="btnLogout" class="btn btn-sm btn-secondary">Logout</button>
+                <div class="header-actions">
+                    <div class="status-indicator" id="globalStatus">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Checking...</span>
+                    </div>
+                    <button id="btnTheme" class="btn btn-sm btn-secondary" title="Toggle theme">🌙</button>
+                </div>
             </div>
         </header>
 
         <main>
             <div class="container">
+                <div class="card quick-guide collapsed" id="quickGuideCard">
+                    <div class="card-header clickable" id="quickGuideToggle">
+                        <div class="header-title">
+                            <span class="icon">⚡</span>
+                            <span class="card-title">Quick Integration Guide</span>
+                        </div>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="guide-content">
+                        <div class="guide-grid">
+                            <div class="guide-section">
+                                <h4>Endpoints</h4>
+                                <div class="code-block"><span class="label">Anthropic</span><code>/v1/messages</code></div>
+                                <div class="code-block"><span class="label">OpenAI</span><code>/v1/chat/completions</code></div>
+                            </div>
+                            <div class="guide-section">
+                                <h4>Authentication</h4>
+                                <div class="code-block"><code>Authorization: Bearer KEY</code></div>
+                                <div class="code-block"><code>x-api-key: KEY</code></div>
+                            </div>
+                        </div>
+                        <div class="guide-section">
+                            <h4>Example</h4>
+                            <pre class="code-pre">curl https://your-domain/v1/messages \
+  -H "x-api-key: YOUR_PROXY_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"claude-sonnet-4-20250514","max_tokens":1024,"messages":[{"role":"user","content":"Hello"}]}'</pre>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="section-header">
                     <h2>API Credentials</h2>
                     <button id="btnAdd" class="btn btn-primary">+ Add Credential</button>
@@ -81,21 +115,9 @@
             </div>
         </div>
 
-        <div id="authModal" class="modal">
-            <div class="modal-content compact">
-                <h3>Admin Access</h3>
-                <p class="text-muted" style="margin: 1rem 0;">Enter your Proxy Key to continue.</p>
-                <form id="authForm">
-                    <div class="form-group">
-                        <input type="password" id="proxyKeyInput" required placeholder="Proxy Key">
-                    </div>
-                    <button type="submit" class="btn btn-primary full-width">Login</button>
-                </form>
-            </div>
-        </div>
 
         <div id="toastContainer" class="toast-container"></div>
     </div>
-    <script src="app.js?v=7"></script>
+    <script src="app.js?v=10"></script>
 </body>
 </html>
