@@ -38,6 +38,40 @@ REQUEST_TIMEOUT=60000                  # Request timeout in ms
 LOG_LEVEL=info                         # Log level: debug, info, warn, error
 ```
 
+## ⚠️ Important Limitations
+
+**Do NOT include `system` role messages in your requests!**
+
+Claude Cloak automatically injects Claude Code system prompts. If you include additional `system` messages, it may trigger upstream detection mechanisms that inspect system prompts, potentially exposing the cloaking.
+
+❌ **Bad - Will trigger detection:**
+```json
+{
+  "messages": [
+    {"role": "system", "content": "You are a helpful assistant"},
+    {"role": "user", "content": "Hello"}
+  ]
+}
+```
+
+✅ **Good - Safe to use:**
+```json
+{
+  "messages": [
+    {"role": "user", "content": "Hello"}
+  ]
+}
+```
+
+**Workaround**: If you need to provide instructions, include them in the first user message instead:
+```json
+{
+  "messages": [
+    {"role": "user", "content": "You are a helpful assistant.\n\nUser question: Hello"}
+  ]
+}
+```
+
 ## API Usage
 
 ### Anthropic Format
