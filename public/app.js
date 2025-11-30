@@ -53,10 +53,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const api = async (endpoint, options = {}) => {
     const headers = {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${proxyKey}`,
         ...options.headers
     };
+    if (options.body) {
+        headers['Content-Type'] = 'application/json';
+    }
     try {
         const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
         if (res.status === 401) {
