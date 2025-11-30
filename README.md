@@ -1,4 +1,8 @@
-<h1 align="center">◆ Claude Cloak</h1>
+<p align="center">
+  <img src="assets/logo.svg" width="80" height="80" alt="Claude Cloak"/>
+</p>
+
+<h1 align="center">Claude Cloak</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Stealth_Proxy-0d9488?style=for-the-badge" alt="Stealth Proxy"/>
