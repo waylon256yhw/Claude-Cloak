@@ -1,0 +1,18 @@
+services:
+  proxy:
+    build: .
+    container_name: claude-cloak
+    env_file: .env
+    ports:
+      - "${PORT:-4000}:${PORT:-4000}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:${PORT:-4000}/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
