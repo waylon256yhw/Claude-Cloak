@@ -1,16 +1,13 @@
+<h1 align="center">◆ Claude Cloak</h1>
+
 <p align="center">
-  <img src="https://img.shields.io/badge/-%23121212?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgZmlsbD0iIzBkOTQ4OCI+PHBhdGggZD0iTTUwIDhDMjcgOCAxMCAyNyAxMCA1MlY5MEw1MCA3M0w5MCA5MFY1MkM5MCAyNyA3MyA4IDUwIDhaIi8+PC9zdmc+" alt="logo" height="28"/>
-  <img src="https://img.shields.io/badge/Claude_Cloak-Stealth_Proxy-0d9488?style=for-the-badge" alt="Claude Cloak"/>
+  <img src="https://img.shields.io/badge/Stealth_Proxy-0d9488?style=for-the-badge" alt="Stealth Proxy"/>
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/>
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"/>
 </p>
 
 <p align="center">
   <em>A lightweight reverse proxy that cloaks API requests as Claude Code CLI format</em>
-</p>
-
-<p align="center">
-  <a href="#quick-start"><img src="https://img.shields.io/badge/Quick_Start-▶-0d9488?style=flat-square" alt="Quick Start"/></a>
-  <a href="#api-usage"><img src="https://img.shields.io/badge/API_Usage-📡-0d9488?style=flat-square" alt="API Usage"/></a>
-  <a href="#admin-panel"><img src="https://img.shields.io/badge/Admin_Panel-⚙-0d9488?style=flat-square" alt="Admin Panel"/></a>
 </p>
 
 ---
