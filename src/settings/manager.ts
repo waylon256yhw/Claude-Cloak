@@ -7,7 +7,7 @@ class SettingsManager {
 
   constructor() {
     this.settings = {
-      strictMode: process.env.STRICT_MODE === 'true',
+      strictMode: process.env.STRICT_MODE !== 'false',
     }
   }
 

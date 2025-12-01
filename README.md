@@ -75,7 +75,7 @@ API_KEY=your-upstream-api-key          # Key for upstream API
 PROXY_KEY=your-custom-key              # Key for client authentication
 REQUEST_TIMEOUT=60000                  # Request timeout in ms
 LOG_LEVEL=info                         # Log level: debug, info, warn, error
-STRICT_MODE=false                      # Strip all user system messages (default: false)
+STRICT_MODE=true                       # Strip all user system messages (default: true)
 ```
 
 ## ⚠️ Important Limitations
@@ -84,13 +84,13 @@ STRICT_MODE=false                      # Strip all user system messages (default
 
 Claude Cloak automatically injects Claude Code system prompts. Additional `system` messages may trigger upstream detection.
 
-**Solution: Enable Strict Mode** to automatically strip all user system messages:
-- Set `STRICT_MODE=true` in `.env`, or
+**Strict Mode (enabled by default)** automatically strips all user system messages, keeping only the Claude Code identity. To disable:
+- Set `STRICT_MODE=false` in `.env`, or
 - Toggle in Admin Panel (`/admin/`)
 
-With Strict Mode **disabled** (default), user system messages are preserved but prepended with Claude Code prompt.
+With Strict Mode **enabled** (default), all user system messages are stripped for maximum stealth.
 
-With Strict Mode **enabled**, all user system messages are stripped, keeping only the Claude Code identity.
+With Strict Mode **disabled**, user system messages are preserved but prepended with Claude Code prompt.
 
 ## API Usage
 
