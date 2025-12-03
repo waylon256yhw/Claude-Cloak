@@ -4,6 +4,7 @@ import { buildStealthHeaders } from '../services/headers.js'
 import { convertOpenAIToClaude, enhanceAnthropicRequest } from '../services/transform.js'
 import { pipeStream } from '../services/stream.js'
 import { credentialManager } from '../credentials/manager.js'
+import { getProxyDispatcher, isProxyError, undiciFetch } from '../services/socks.js'
 
 interface UpstreamConfig {
   targetUrl: string
@@ -58,11 +59,12 @@ async function proxyToClaude(
   const timeoutId = setTimeout(() => controller.abort(), config.requestTimeout)
 
   try {
-    const response = await fetch(`${upstream.targetUrl}/v1/messages`, {
+    const response = await undiciFetch(`${upstream.targetUrl}/v1/messages`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
       signal: controller.signal,
+      dispatcher: getProxyDispatcher(),
     })
 
     clearTimeout(timeoutId)
@@ -70,7 +72,7 @@ async function proxyToClaude(
     const contentType = response.headers.get('content-type') || ''
 
     if (contentType.includes('text/event-stream')) {
-      return pipeStream(response, reply, controller.signal)
+      return pipeStream(response as Parameters<typeof pipeStream>[0], reply, controller.signal)
     }
 
     const data = await response.text()
@@ -91,8 +93,14 @@ async function proxyToClaude(
     return result
   } catch (err) {
     clearTimeout(timeoutId)
-    if ((err as Error).name === 'AbortError') {
+    const error = err as Error & { code?: string; cause?: { code?: string } }
+    if (error.name === 'AbortError') {
       reply.code(504).send({ error: 'Gateway Timeout', message: 'Upstream request timed out' })
+      return
+    }
+    if (isProxyError(error)) {
+      request.log.error({ err: error }, 'WARP proxy connection failed')
+      reply.code(502).send({ error: 'Bad Gateway', message: 'Proxy unavailable' })
       return
     }
     throw err

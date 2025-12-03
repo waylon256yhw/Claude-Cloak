@@ -5,6 +5,7 @@ export interface Config {
   proxyKey: string
   requestTimeout: number
   logLevel: string
+  warpProxy: string | null
 }
 
 export interface OpenAIMessage {

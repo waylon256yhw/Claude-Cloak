@@ -1,7 +1,7 @@
 import type { FastifyReply } from 'fastify'
 
 export async function pipeStream(
-  response: Response,
+  response: { status: number; body: ReadableStream | null },
   reply: FastifyReply,
   signal: AbortSignal
 ): Promise<void> {
@@ -17,14 +17,16 @@ export async function pipeStream(
     'X-Accel-Buffering': 'no',
   })
 
-  const reader = response.body.getReader()
+  const reader = (response.body as ReadableStream<Uint8Array>).getReader()
   const decoder = new TextDecoder()
 
   try {
     while (!signal.aborted) {
-      const { done, value } = await reader.read()
-      if (done) break
-      reply.raw.write(decoder.decode(value, { stream: true }))
+      const result = await reader.read()
+      if (result.done) break
+      if (result.value) {
+        reply.raw.write(decoder.decode(result.value, { stream: true }))
+      }
     }
   } finally {
     reader.releaseLock()

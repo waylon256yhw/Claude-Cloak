@@ -10,8 +10,11 @@ import { modelsRoutes } from './routes/models.js'
 import { proxyRoutes } from './routes/proxy.js'
 import { adminRoutes } from './routes/admin.js'
 import { credentialManager } from './credentials/manager.js'
+import { initSocksProxy } from './services/socks.js'
 
 const config = loadConfig()
+
+initSocksProxy(config)
 
 await credentialManager.init()
 

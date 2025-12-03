@@ -16,5 +16,6 @@ export function loadConfig(): Config {
     proxyKey: requireEnv('PROXY_KEY'),
     requestTimeout: parseInt(process.env.REQUEST_TIMEOUT || '60000', 10),
     logLevel: process.env.LOG_LEVEL || 'info',
+    warpProxy: process.env.WARP_PROXY || null,
   }
 }
