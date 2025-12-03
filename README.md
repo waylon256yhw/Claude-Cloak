@@ -18,6 +18,7 @@
 ## Features
 
 - **Request Cloaking**: Transforms all incoming requests to appear as Claude Code CLI
+- **IP Obfuscation**: Route upstream requests through Cloudflare WARP SOCKS5 proxy
 - **Dual API Format**: Supports both OpenAI (`/v1/chat/completions`) and Anthropic (`/v1/messages`) formats
 - **Dual Authentication**: Accepts `Authorization: Bearer` and `x-api-key` headers
 - **System Prompt Injection**: Automatically injects Claude Code identity
@@ -76,7 +77,93 @@ PROXY_KEY=your-custom-key              # Key for client authentication
 REQUEST_TIMEOUT=60000                  # Request timeout in ms
 LOG_LEVEL=info                         # Log level: debug, info, warn, error
 STRICT_MODE=true                       # Strip all user system messages (default: true)
+WARP_PROXY=socks5h://host.docker.internal:40001  # WARP SOCKS5 proxy (optional)
 ```
+
+## WARP Proxy Setup (Optional)
+
+Enable IP obfuscation by routing upstream requests through Cloudflare WARP:
+
+### Network Topology
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Host Machine                                                   │
+│                                                                 │
+│  ┌─────────────┐    ┌──────────────────────────────────────┐   │
+│  │ warp-svc    │    │  Docker: claude-cloak                │   │
+│  │ SOCKS5      │◄───│                                      │   │
+│  │ :40000      │    │  User ──direct──▶ Proxy ──SOCKS5──┐  │   │
+│  └──────┬──────┘    │                                   │  │   │
+│         │           │                                   ▼  │   │
+│  ┌──────┴──────┐    │                            ┌─────────┴┐  │
+│  │ socat       │    │                            │ Upstream │  │
+│  │ :40001      │    │                            │ Request  │  │
+│  └─────────────┘    └────────────────────────────┴──────────┘  │
+│         │                                                       │
+└─────────┼───────────────────────────────────────────────────────┘
+          │ WARP Tunnel
+          ▼
+   Cloudflare WARP
+   (Masked Exit IP)
+          │
+          ▼
+   Upstream Claude API
+```
+
+**Key Points:**
+- **User → Docker**: Direct TCP connection (your real IP visible to proxy)
+- **Docker → Upstream**: Routed through WARP (upstream sees Cloudflare IP)
+- Cloudflare WARP free tier is sufficient
+
+### Host Setup
+
+```bash
+# Install Cloudflare WARP
+curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | \
+  gpg --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] \
+  https://pkg.cloudflareclient.com/ bookworm main" | \
+  tee /etc/apt/sources.list.d/cloudflare-client.list
+apt-get update && apt-get install cloudflare-warp
+
+# Configure SOCKS5 proxy mode
+warp-cli --accept-tos registration new
+warp-cli --accept-tos mode proxy
+warp-cli --accept-tos proxy port 40000
+warp-cli --accept-tos connect
+
+# Verify
+curl --socks5 127.0.0.1:40000 https://ipinfo.io/ip  # Should show Cloudflare IP
+```
+
+Since WARP only binds to 127.0.0.1, create a systemd service to forward to Docker:
+
+```bash
+# /etc/systemd/system/warp-proxy-forward.service
+[Unit]
+Description=Forward WARP SOCKS5 proxy to Docker
+After=warp-svc.service
+
+[Service]
+ExecStart=/usr/bin/socat TCP-LISTEN:40001,bind=0.0.0.0,fork,reuseaddr TCP:127.0.0.1:40000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+systemctl enable --now warp-proxy-forward
+```
+
+### Enable in .env
+
+```env
+WARP_PROXY=socks5h://host.docker.internal:40001
+```
+
+> Use `socks5h://` (not `socks5://`) to ensure DNS queries also go through WARP.
 
 ## ⚠️ Important Limitations
 
@@ -201,7 +288,8 @@ claude-cloak/
 │   │   ├── headers.ts      # Stealth headers
 │   │   ├── transform.ts    # Format conversion
 │   │   ├── stream.ts       # SSE handling
-│   │   └── user.ts         # User ID generation
+│   │   ├── user.ts         # User ID generation
+│   │   └── socks.ts        # WARP SOCKS5 proxy
 │   ├── credentials/
 │   │   ├── manager.ts      # Credential CRUD operations
 │   │   ├── storage.ts      # JSON file persistence
