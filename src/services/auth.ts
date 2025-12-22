@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import type { Config } from '../types.js'
 
@@ -13,7 +14,15 @@ export function createAuthHook(config: Config) {
       return reply
     }
 
-    if (key !== config.proxyKey) {
+    // Use timing-safe comparison to prevent timing attacks
+    const keyBuffer = Buffer.from(key)
+    const proxyKeyBuffer = Buffer.from(config.proxyKey)
+
+    // Only compare if lengths match (timingSafeEqual requires same length)
+    const isValid = keyBuffer.length === proxyKeyBuffer.length &&
+      timingSafeEqual(keyBuffer, proxyKeyBuffer)
+
+    if (!isValid) {
       reply.code(401).send({
         error: 'Unauthorized',
         message: 'Invalid API key',

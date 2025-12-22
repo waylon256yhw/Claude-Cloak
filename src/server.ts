@@ -24,7 +24,21 @@ const fastify = Fastify({
   },
 })
 
-await fastify.register(helmet, { contentSecurityPolicy: false })
+await fastify.register(helmet, {
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts in admin panel
+      styleSrc: ["'self'", "'unsafe-inline'"],  // Allow inline styles in admin panel
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+})
 await fastify.register(rateLimit, {
   max: 100,
   timeWindow: '1 minute',

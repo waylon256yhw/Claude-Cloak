@@ -388,7 +388,7 @@ function renderList() {
             </div>
             <div class="card-details">
                 <div class="detail-row"><span>Target</span><span class="code" title="${esc(cred.targetUrl)}">${esc(cred.targetUrl)}</span></div>
-                <div class="detail-row"><span>Key</span><span class="code">${cred.apiKey.length > 8 ? '...' + cred.apiKey.slice(-4) : '****'}</span></div>
+                <div class="detail-row"><span>Key</span><span class="code">${esc(cred.apiKey)}</span></div>
             </div>
             <div class="card-actions">
                 ${!cred.isActive ? `<button class="btn-icon" onclick="activateCredential('${cred.id}')" title="Activate">${icons.power}</button>` : ''}
