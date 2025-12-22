@@ -5,7 +5,6 @@ import { enhanceAnthropicRequest } from '../services/transform.js'
 import { pipeStream } from '../services/stream.js'
 import { credentialManager } from '../credentials/manager.js'
 import { getProxyDispatcher, isProxyError, undiciFetch } from '../services/socks.js'
-import { anthropicMessageSchema } from '../services/validation.js'
 
 interface UpstreamConfig {
   targetUrl: string
@@ -24,8 +23,7 @@ function getUpstreamConfig(config: Config): UpstreamConfig {
 }
 
 export async function proxyRoutes(fastify: FastifyInstance, config: Config) {
-  // Only support Anthropic native format with request validation
-  fastify.post('/v1/messages', anthropicMessageSchema, async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/v1/messages', async (request: FastifyRequest, reply: FastifyReply) => {
     const anthropicRequest = request.body as ClaudeRequest
     const enhancedRequest = enhanceAnthropicRequest(anthropicRequest)
     return proxyToClaude(config, enhancedRequest, request, reply)
