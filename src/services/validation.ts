@@ -29,23 +29,21 @@ export const anthropicMessageSchema = {
               content: {
                 oneOf: [
                   { type: 'string' },
-                  { type: 'array' },
+                  {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                    },
+                  },
                 ],
               },
             },
           },
         },
-        system: {
-          type: 'array',
-          items: {
-            type: 'object',
-          },
-        },
+        // system can be string or array, let transform.ts handle normalization
+        system: {},
         tools: {
           type: 'array',
-          items: {
-            type: 'object',
-          },
         },
         temperature: {
           type: 'number',

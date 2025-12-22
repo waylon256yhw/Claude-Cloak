@@ -73,12 +73,11 @@ async function proxyToClaude(
     const contentType = response.headers.get('content-type') || ''
 
     if (contentType.includes('text/event-stream')) {
-      // Keep streaming timeout active during SSE
-      const streamTimeout = setTimeout(() => controller.abort(), config.requestTimeout * 2)
+      // Use idle timeout: reset on each chunk, only abort if no data received
+      const idleTimeout = config.requestTimeout * 2
       try {
-        return await pipeStream(response as Parameters<typeof pipeStream>[0], reply, controller.signal)
+        return await pipeStream(response as Parameters<typeof pipeStream>[0], reply, controller.signal, idleTimeout)
       } finally {
-        clearTimeout(streamTimeout)
         // Clean up listeners
         request.raw.off('close', cleanup)
         request.raw.off('aborted', cleanup)
