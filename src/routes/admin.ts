@@ -9,6 +9,13 @@ interface IdParams {
   id: string
 }
 
+// Detect if a key looks like a masked value (e.g., "...abcd" or "****")
+function looksLikeMaskedKey(key: string): boolean {
+  if (!key) return false
+  const trimmed = key.trim()
+  return /^\.{3,}/.test(trimmed) || /^\*{3,}$/.test(trimmed)
+}
+
 export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
 
   fastify.get('/credentials', async () => {
@@ -33,16 +40,27 @@ export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
       reply.code(400).send({ error: 'Bad Request', message: 'Missing required fields: name, targetUrl, apiKey' })
       return
     }
+    if (looksLikeMaskedKey(apiKey)) {
+      reply.code(400).send({ error: 'Bad Request', message: 'Masked API key cannot be saved. Please provide the full key.' })
+      return
+    }
     try {
-      return await credentialManager.create({ name, targetUrl, apiKey })
+      const created = await credentialManager.create({ name, targetUrl, apiKey })
+      return maskCredential(created)
     } catch (err) {
       reply.code(500).send({ error: 'Internal Server Error', message: (err as Error).message })
     }
   })
 
   fastify.put<{ Params: IdParams; Body: UpdateCredentialInput }>('/credentials/:id', async (request, reply) => {
+    const { apiKey } = request.body || {}
+    if (apiKey && looksLikeMaskedKey(apiKey)) {
+      reply.code(400).send({ error: 'Bad Request', message: 'Masked API key cannot be saved. Please provide the full key or leave blank to keep existing.' })
+      return
+    }
     try {
-      return await credentialManager.update(request.params.id, request.body || {})
+      const updated = await credentialManager.update(request.params.id, request.body || {})
+      return maskCredential(updated)
     } catch (err) {
       const msg = (err as Error).message
       if (msg.includes('not found')) {

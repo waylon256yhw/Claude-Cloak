@@ -89,7 +89,7 @@ export class CredentialManager {
         ...existing,
         name: input.name ?? existing.name,
         targetUrl: input.targetUrl ? input.targetUrl.replace(/\/+$/, '') : existing.targetUrl,
-        apiKey: input.apiKey ?? existing.apiKey,
+        apiKey: (input.apiKey && input.apiKey.trim()) ? input.apiKey.trim() : existing.apiKey,
         updatedAt: new Date().toISOString(),
       }
       this.store.credentials[idx] = updated

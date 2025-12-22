@@ -388,16 +388,29 @@ function renderList() {
             </div>
             <div class="card-details">
                 <div class="detail-row"><span>Target</span><span class="code" title="${esc(cred.targetUrl)}">${esc(cred.targetUrl)}</span></div>
-                <div class="detail-row"><span>Key</span><span class="code">${esc(cred.apiKey)}</span></div>
+                <div class="detail-row"><span>Key</span><span class="code">${esc(cred.keyMasked)}</span></div>
             </div>
             <div class="card-actions">
-                ${!cred.isActive ? `<button class="btn-icon" onclick="activateCredential('${cred.id}')" title="Activate">${icons.power}</button>` : ''}
-                <button class="btn-icon" onclick="editCredential('${cred.id}')" title="Edit">${icons.faders}</button>
-                <button class="btn-icon btn-icon-danger" onclick="deleteCredential('${cred.id}')" title="Delete">${icons.disconnect}</button>
+                ${!cred.isActive ? `<button class="btn-icon" data-action="activate" data-id="${cred.id}" title="Activate">${icons.power}</button>` : ''}
+                <button class="btn-icon" data-action="edit" data-id="${cred.id}" title="Edit">${icons.faders}</button>
+                <button class="btn-icon btn-icon-danger" data-action="delete" data-id="${cred.id}" title="Delete">${icons.disconnect}</button>
             </div>
         </div>
     `).join('');
 }
+
+// Event delegation for card actions
+els.list.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+    const id = btn.dataset.id;
+
+    if (action === 'activate') activateCredential(id);
+    else if (action === 'edit') editCredential(id);
+    else if (action === 'delete') deleteCredential(id);
+});
 
 document.getElementById('btnAdd').addEventListener('click', () => openModal());
 document.getElementById('btnModalClose').addEventListener('click', closeModal);
@@ -405,12 +418,23 @@ document.getElementById('btnCancel').addEventListener('click', closeModal);
 
 els.form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const editId = document.getElementById('editId').value || undefined;
+    const apiKeyValue = document.getElementById('apiKey').value.trim();
+    const isEdit = !!editId;
+
     const data = {
-        id: document.getElementById('editId').value || undefined,
+        id: editId,
         name: document.getElementById('name').value,
-        targetUrl: document.getElementById('targetUrl').value,
-        apiKey: document.getElementById('apiKey').value
+        targetUrl: document.getElementById('targetUrl').value
     };
+
+    // Only include apiKey if:
+    // 1. Adding new credential (isEdit=false), or
+    // 2. Editing and user provided a new key
+    if (!isEdit || apiKeyValue) {
+        data.apiKey = apiKeyValue;
+    }
+
     await saveCredential(data);
 });
 
@@ -421,20 +445,38 @@ document.querySelector('.toggle-visibility').addEventListener('click', function(
 });
 
 function openModal(cred = null) {
-    document.getElementById('modalTitle').textContent = cred ? 'Edit Credential' : 'Add Credential';
+    const isEdit = !!cred;
+    document.getElementById('modalTitle').textContent = isEdit ? 'Edit Credential' : 'Add Credential';
     document.getElementById('editId').value = cred ? cred.id : '';
     document.getElementById('name').value = cred ? cred.name : '';
     document.getElementById('targetUrl').value = cred ? cred.targetUrl : '';
-    document.getElementById('apiKey').value = cred ? cred.apiKey : '';
+
+    const apiKeyInput = document.getElementById('apiKey');
+    const currentKeyDisplay = document.getElementById('currentKeyDisplay');
+    const currentKeyMasked = document.getElementById('currentKeyMasked');
+
+    if (isEdit) {
+        // Edit mode: show current masked key, clear input
+        apiKeyInput.value = '';
+        apiKeyInput.removeAttribute('required');
+        apiKeyInput.placeholder = 'Leave blank to keep existing key';
+        currentKeyMasked.textContent = cred.keyMasked || '****';
+        currentKeyDisplay.classList.remove('hidden');
+    } else {
+        // Add mode: require key
+        apiKeyInput.value = '';
+        apiKeyInput.setAttribute('required', 'required');
+        apiKeyInput.placeholder = 'sk-ant-...';
+        currentKeyDisplay.classList.add('hidden');
+    }
+
     els.modal.classList.remove('hidden');
 }
 
-window.editCredential = (id) => {
+function editCredential(id) {
     const cred = credentials.find(c => c.id === id);
     if (cred) openModal(cred);
-};
-window.activateCredential = activateCredential;
-window.deleteCredential = deleteCredential;
+}
 
 function closeModal() {
     els.modal.classList.add('hidden');

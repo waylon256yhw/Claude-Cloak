@@ -496,6 +496,20 @@ input:checked + .toggle-slider::before { transform: translateX(22px); }
     color: var(--text-main);
 }
 
+.current-key-display {
+    margin-bottom: 0.5rem;
+    padding: 0.75rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-btn);
+    font-size: 0.9rem;
+}
+
+.current-key-display .code {
+    color: var(--text-main);
+    font-weight: 500;
+}
+
 input[type="text"], input[type="password"], input[type="url"] {
     width: 100%;
     padding: 0.75rem;

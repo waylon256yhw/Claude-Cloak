@@ -102,8 +102,12 @@
                     </div>
                     <div class="form-group">
                         <label for="apiKey">API Key</label>
+                        <div id="currentKeyDisplay" class="current-key-display hidden">
+                            <span class="text-muted">Current key: </span>
+                            <span class="code" id="currentKeyMasked"></span>
+                        </div>
                         <div class="input-group">
-                            <input type="password" id="apiKey" required placeholder="sk-ant-...">
+                            <input type="password" id="apiKey" placeholder="Leave blank to keep existing key">
                             <button type="button" class="btn-icon toggle-visibility" tabindex="-1">👁️</button>
                         </div>
                     </div>
