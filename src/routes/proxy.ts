@@ -1,10 +1,11 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
-import type { Config, OpenAIChatRequest, ClaudeRequest } from '../types.js'
+import type { Config, ClaudeRequest } from '../types.js'
 import { buildStealthHeaders } from '../services/headers.js'
-import { convertOpenAIToClaude, enhanceAnthropicRequest } from '../services/transform.js'
+import { enhanceAnthropicRequest } from '../services/transform.js'
 import { pipeStream } from '../services/stream.js'
 import { credentialManager } from '../credentials/manager.js'
 import { getProxyDispatcher, isProxyError, undiciFetch } from '../services/socks.js'
+import { anthropicMessageSchema } from '../services/validation.js'
 
 interface UpstreamConfig {
   targetUrl: string
@@ -23,13 +24,8 @@ function getUpstreamConfig(config: Config): UpstreamConfig {
 }
 
 export async function proxyRoutes(fastify: FastifyInstance, config: Config) {
-  fastify.post('/v1/chat/completions', async (request: FastifyRequest, reply: FastifyReply) => {
-    const openaiRequest = request.body as OpenAIChatRequest
-    const claudeRequest = convertOpenAIToClaude(openaiRequest)
-    return proxyToClaude(config, claudeRequest, request, reply)
-  })
-
-  fastify.post('/v1/messages', async (request: FastifyRequest, reply: FastifyReply) => {
+  // Only support Anthropic native format with request validation
+  fastify.post('/v1/messages', anthropicMessageSchema, async (request: FastifyRequest, reply: FastifyReply) => {
     const anthropicRequest = request.body as ClaudeRequest
     const enhancedRequest = enhanceAnthropicRequest(anthropicRequest)
     return proxyToClaude(config, enhancedRequest, request, reply)
@@ -54,9 +50,14 @@ async function proxyToClaude(
   const headers = buildStealthHeaders(upstream.apiKey, isStream)
   const controller = new AbortController()
 
-  request.raw.on('close', () => controller.abort())
+  // Listen to both request and response close events
+  const cleanup = () => controller.abort()
+  request.raw.on('close', cleanup)
+  request.raw.on('aborted', cleanup)
+  reply.raw.on('close', cleanup)
 
-  const timeoutId = setTimeout(() => controller.abort(), config.requestTimeout)
+  // Initial timeout for connection
+  const initialTimeout = setTimeout(() => controller.abort(), config.requestTimeout)
 
   try {
     const response = await undiciFetch(`${upstream.targetUrl}/v1/messages`, {
@@ -67,12 +68,22 @@ async function proxyToClaude(
       dispatcher: getProxyDispatcher(),
     })
 
-    clearTimeout(timeoutId)
+    clearTimeout(initialTimeout)
 
     const contentType = response.headers.get('content-type') || ''
 
     if (contentType.includes('text/event-stream')) {
-      return pipeStream(response as Parameters<typeof pipeStream>[0], reply, controller.signal)
+      // Keep streaming timeout active during SSE
+      const streamTimeout = setTimeout(() => controller.abort(), config.requestTimeout * 2)
+      try {
+        return await pipeStream(response as Parameters<typeof pipeStream>[0], reply, controller.signal)
+      } finally {
+        clearTimeout(streamTimeout)
+        // Clean up listeners
+        request.raw.off('close', cleanup)
+        request.raw.off('aborted', cleanup)
+        reply.raw.off('close', cleanup)
+      }
     }
 
     const data = await response.text()
@@ -92,7 +103,7 @@ async function proxyToClaude(
 
     return result
   } catch (err) {
-    clearTimeout(timeoutId)
+    clearTimeout(initialTimeout)
     const error = err as Error & { code?: string; cause?: { code?: string } }
     if (error.name === 'AbortError') {
       reply.code(504).send({ error: 'Gateway Timeout', message: 'Upstream request timed out' })
@@ -104,5 +115,10 @@ async function proxyToClaude(
       return
     }
     throw err
+  } finally {
+    // Clean up listeners for non-streaming case
+    request.raw.off('close', cleanup)
+    request.raw.off('aborted', cleanup)
+    reply.raw.off('close', cleanup)
   }
 }

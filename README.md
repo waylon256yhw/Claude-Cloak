@@ -19,14 +19,14 @@
 
 - **Request Cloaking**: Transforms all incoming requests to appear as Claude Code CLI
 - **IP Obfuscation**: Route upstream requests through Cloudflare WARP SOCKS5 proxy
-- **Dual API Format**: Supports both OpenAI (`/v1/chat/completions`) and Anthropic (`/v1/messages`) formats
+- **Anthropic Native Format**: Full support for Anthropic API including tool calling and multimodal content
 - **Dual Authentication**: Accepts `Authorization: Bearer` and `x-api-key` headers
 - **System Prompt Injection**: Automatically injects Claude Code identity
 - **Stealth Headers**: Mimics authentic Claude CLI request headers
-- **SSE Streaming**: Full support for streaming responses
+- **SSE Streaming**: Full support for streaming responses with backpressure handling
 - **Multi-Credential Management**: Store multiple upstream API credentials, switch at runtime
 - **Strict Mode**: Strip all user system messages, keep only Claude Code prompt
-- **Admin Panel**: Web UI for credential and settings management
+- **Admin Panel**: Web UI for credential and settings management (authentication required)
 - **Docker Ready**: One-command deployment with Docker Compose
 
 ## Quick Start
@@ -44,28 +44,37 @@ docker compose up -d
 curl http://localhost:4000/healthz
 ```
 
-## Verified Clients
+## Supported Clients
 
-Tested and verified with these frontends:
+Any client that supports **Anthropic API format** can use this proxy:
 
 <table>
   <tr>
-    <td align="center" width="200">
-      <a href="https://github.com/CherryHQ/cherry-studio">
-        <img src="https://github.com/CherryHQ/cherry-studio/raw/main/build/icon.png" width="64" height="64" alt="Cherry Studio"/><br/>
-        <b>Cherry Studio</b>
-      </a><br/>
-      <sub>OpenAI Format</sub>
-    </td>
     <td align="center" width="200">
       <a href="https://github.com/SillyTavern/SillyTavern">
         <img src="https://github.com/SillyTavern/SillyTavern/raw/release/public/img/ai4.png" width="64" height="64" alt="SillyTavern"/><br/>
         <b>SillyTavern</b>
       </a><br/>
-      <sub>OpenAI / Claude Format</sub>
+      <sub>Anthropic Format</sub>
+    </td>
+    <td align="center" width="200">
+      <a href="https://github.com/anthropics/anthropic-sdk-typescript">
+        <img src="https://avatars.githubusercontent.com/u/77675888?s=200&v=4" width="64" height="64" alt="Anthropic SDK"/><br/>
+        <b>Anthropic SDK</b>
+      </a><br/>
+      <sub>Official Client</sub>
+    </td>
+    <td align="center" width="200">
+      <a href="https://github.com/anthropics/claude-code">
+        <img src="https://raw.githubusercontent.com/anthropics/claude-code/refs/heads/main/assets/hero.png" width="64" height="64" alt="Claude Code CLI"/><br/>
+        <b>Claude Code CLI</b>
+      </a><br/>
+      <sub>Official CLI</sub>
     </td>
   </tr>
 </table>
+
+> **Note**: This proxy only supports **Anthropic native format** (`/v1/messages`). OpenAI format is not supported.
 
 ## Configuration
 
@@ -181,7 +190,7 @@ With Strict Mode **disabled**, user system messages are preserved but prepended 
 
 ## API Usage
 
-### Anthropic Format
+### Standard Request
 
 ```bash
 curl -X POST https://your-domain/v1/messages \
@@ -190,18 +199,6 @@ curl -X POST https://your-domain/v1/messages \
   -d '{
     "model": "claude-sonnet-4-20250514",
     "max_tokens": 1024,
-    "messages": [{"role": "user", "content": "Hello"}]
-  }'
-```
-
-### OpenAI Format
-
-```bash
-curl -X POST https://your-domain/v1/chat/completions \
-  -H "x-api-key: YOUR_PROXY_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "claude-sonnet-4-20250514",
     "messages": [{"role": "user", "content": "Hello"}]
   }'
 ```
@@ -227,9 +224,8 @@ curl -X POST https://your-domain/v1/messages \
 | GET | `/healthz` | Health check |
 | GET | `/health` | Detailed health info |
 | GET | `/v1/models` | List available models |
-| POST | `/v1/messages` | Anthropic format |
-| POST | `/v1/chat/completions` | OpenAI format |
-| GET | `/admin/` | Admin Panel (Web UI) |
+| POST | `/v1/messages` | Anthropic native format (with tool calling support) |
+| GET | `/admin/` | Admin Panel (Web UI, requires authentication) |
 
 ## Admin Panel
 
@@ -238,7 +234,7 @@ Access the web-based admin panel at `/admin/` to:
 - **Toggle Strict Mode**: Enable/disable system message stripping at runtime
 - **Monitor Status**: View proxy health status
 
-Authentication uses `PROXY_KEY` from your configuration.
+> **Security**: Admin API endpoints require authentication using `PROXY_KEY`.
 
 ## Authentication
 

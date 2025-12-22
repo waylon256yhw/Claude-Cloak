@@ -27,3 +27,7 @@ Thumbs.db
 # Docker
 .dockerignore
 data/
+
+# Working documents
+PLAN.md
+PROGRESS.md

@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import type { Config } from '../types.js'
 import { credentialManager } from '../credentials/manager.js'
 import type { CreateCredentialInput, UpdateCredentialInput } from '../credentials/types.js'
+import { maskCredential } from '../credentials/types.js'
 import { settingsManager, type Settings } from '../settings/manager.js'
 
 interface IdParams {
@@ -11,7 +12,9 @@ interface IdParams {
 export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
 
   fastify.get('/credentials', async () => {
-    return credentialManager.getAll()
+    const credentials = credentialManager.getAll()
+    // Mask API keys in list view for security
+    return credentials.map(maskCredential)
   })
 
   fastify.get<{ Params: IdParams }>('/credentials/:id', async (request, reply) => {
@@ -20,7 +23,8 @@ export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
       reply.code(404).send({ error: 'Not Found', message: 'Credential not found' })
       return
     }
-    return cred
+    // Mask API key for security
+    return maskCredential(cred)
   })
 
   fastify.post<{ Body: CreateCredentialInput }>('/credentials', async (request, reply) => {

@@ -44,11 +44,18 @@ await fastify.register(async (instance) => {
 
 const authHook = createAuthHook(config)
 fastify.addHook('preHandler', async (request, reply) => {
-  if (
-    request.url === '/healthz' ||
-    request.url === '/health' ||
-    request.url.startsWith('/admin/')
-  ) return
+  // Skip auth for health check endpoints
+  if (request.url === '/healthz' || request.url === '/health') {
+    return
+  }
+
+  // Skip auth for admin static files only (not API endpoints)
+  // /admin/ -> index.html, /admin/styles.css, /admin/app.js, etc.
+  // But /admin/api/* requires authentication
+  if (request.url.startsWith('/admin/') && !request.url.startsWith('/admin/api/')) {
+    return
+  }
+
   return authHook(request, reply)
 })
 
@@ -62,7 +69,6 @@ fastify.setNotFoundHandler(async (request, reply) => {
     error: 'Not Found',
     message: 'Endpoint not supported',
     available_endpoints: [
-      'POST /v1/chat/completions',
       'POST /v1/messages',
       'GET /v1/models',
       'GET /healthz',

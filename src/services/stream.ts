@@ -24,10 +24,23 @@ export async function pipeStream(
     while (!signal.aborted) {
       const result = await reader.read()
       if (result.done) break
+
       if (result.value) {
-        reply.raw.write(decoder.decode(result.value, { stream: true }))
+        const chunk = decoder.decode(result.value, { stream: true })
+        const canContinue = reply.raw.write(chunk)
+
+        // Handle backpressure: pause if downstream is slow
+        if (!canContinue) {
+          await new Promise<void>((resolve) => {
+            reply.raw.once('drain', resolve)
+          })
+        }
       }
     }
+  } catch (err) {
+    // Abort reader on error or signal
+    reader.cancel()
+    throw err
   } finally {
     reader.releaseLock()
   }

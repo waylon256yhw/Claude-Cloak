@@ -263,4 +263,14 @@ function showConfirm({ title, message, icon = 'warning', danger = false }) {
     });
 }
 
-const esc = (str) => str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// Enhanced escaping function to prevent XSS in HTML context
+// Escapes: & < > " '
+const esc = (str) => {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
