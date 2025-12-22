@@ -20,18 +20,16 @@
 
 ### 📋 `PLAN.md` - 总体修复计划
 基于 Codex 深度调研的修复计划，包含：
-- P0 安全修复（4 项）
-- 功能完善（Tool Calling、多模态）
-- 稳定性增强（流式鲁棒性、请求验证）
-- 后续优化建议（连接池、日志）
+- Session 1+2: P0 安全修复（4 项）+ 功能完善 + 稳定性增强
+- Session 3: Admin Panel 按钮失效修复 + Write-Only Key 安全模式
+- 后续优化建议（认证重构、连接池、日志）
 
 ### 📊 `PROGRESS.md` - 进度跟踪
-详细记录本 session 的所有修复：
-- 任务进度（11 项已完成）
-- Commit 记录
-- 问题与解决方案
-- 测试结果
-- 代码质量改进统计
+详细记录所有 session 的修复：
+- **Session 1+2**: 11 项 P0/P1/P2 修复（4 个 commit）
+- **Session 3**: 2 项 P0 Bug 修复 + Write-Only Key 模式（1 个 commit）
+- Commit 记录、问题诊断、解决方案、测试结果
+- 代码质量改进统计（+402 行 / -105 行）
 
 **查看方式**: 这两个文档已添加到 `.gitignore`，不会进入版本控制。
 
@@ -60,18 +58,20 @@ docker compose up -d --build
 
 ## 最近修复（2025-12-22）
 
-### ✅ P0 安全修复
+### Session 3: Admin Panel 按钮失效修复 ⚡
+- **CSP 违规修复**: 移除内联 `onclick`，使用事件委托（所有按钮恢复正常）
+- **Write-Only Key 安全模式**: 密钥永不明文返回浏览器，编辑时显示 last4 + 空白输入框
+- **防御性编程**: 后端拒绝 masked 值（如 `...xxxx`）被保存
+- **编辑 UI 改进**: "Current key: ...xxxx" 提示 + "Leave blank to keep existing key"
+
+### Session 1+2: 核心安全与功能增强 🔒
 - **Admin API 认证**: `/admin/api/*` 现在强制要求 PROXY_KEY 认证
 - **前端认证实现**: 登录页覆盖层，sessionStorage/localStorage 存储
-- **密钥脱敏**: GET 接口返回 `...xxxx` 格式
-- **XSS 防护**: 增强 HTML 转义（`& < > " '`）
-
-### ✅ 功能增强
+- **密钥脱敏**: GET 接口返回 `keyMasked` + `keyLast4` 格式
+- **XSS 防护**: 增强 HTML 转义（`& < > " '`）+ CSP 策略
 - **Tool Calling**: 完整支持 Anthropic `tool_use` / `tool_result` blocks
 - **多模态内容**: 正确处理文本+图片混合 content 数组
 - **流式鲁棒性**: 超时保护 + 完整 abort 监听 + 背压处理
-
-### ✅ 架构简化
 - **删除 OpenAI 端点**: 移除半残缺的 `/v1/chat/completions`，避免客户端崩溃
 
 详见 `PROGRESS.md` 完整记录。
@@ -110,14 +110,20 @@ docker compose up -d --build
 
 ## 下一步
 
-### 测试清单（下一个 session）
-- [ ] Docker 重建和部署
-- [ ] Admin 认证边界测试（有/无密钥）
+### 已完成测试 ✅
+- [x] Docker 重建和部署（Session 3）
+- [x] Admin Panel 按钮功能测试（编辑/删除/激活）
+- [x] Write-Only Key 安全模式测试
+- [x] CSP 兼容性验证
+
+### 可选测试（下一个 session）
+- [ ] Admin 认证边界测试（完整覆盖）
 - [ ] 高并发流式请求测试（100+ 并发）
 - [ ] Tool calling 真实请求测试
-- [ ] 多模态内容测试
+- [ ] 多模态内容测试（图片 + 文本）
 
 ### 可选优化（P1/P2）
+- [ ] 认证边界健壮性重构（插件级别 hook）
 - [ ] `/v1/models` 错误映射改进
 - [ ] 连接池调优（Undici Agent 配置）
 - [ ] 结构化日志（pino）
