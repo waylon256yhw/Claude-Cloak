@@ -1,6 +1,129 @@
 const API_BASE = '/admin/api';
 
+const AUTH_STORAGE_KEY = 'claude_admin_proxy_key';
+const IDLE_LOGOUT_MS = 30 * 60 * 1000; // 30 minutes, set to 0 to disable
+
 let credentials = [];
+let idleTimer = null;
+let idleListenersAttached = false;
+let unauthorizedHandled = false;
+
+// Storage helpers
+function getStoredProxyKey() {
+    return sessionStorage.getItem(AUTH_STORAGE_KEY) || localStorage.getItem(AUTH_STORAGE_KEY);
+}
+
+function getStoredProxyKeySource() {
+    if (sessionStorage.getItem(AUTH_STORAGE_KEY)) return 'session';
+    if (localStorage.getItem(AUTH_STORAGE_KEY)) return 'local';
+    return null;
+}
+
+function setStoredProxyKey(key, remember) {
+    if (remember) {
+        localStorage.setItem(AUTH_STORAGE_KEY, key);
+        sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    } else {
+        sessionStorage.setItem(AUTH_STORAGE_KEY, key);
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+    }
+}
+
+function clearStoredProxyKey() {
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+// UI State
+function setAuthedUI(authed) {
+    const btnLogout = document.getElementById('btnLogout');
+    if (btnLogout) btnLogout.classList.toggle('hidden', !authed);
+}
+
+function setAuthError(message) {
+    if (!els.authError) return;
+    if (message) {
+        els.authError.textContent = message;
+        els.authError.classList.add('show');
+    } else {
+        els.authError.textContent = '';
+        els.authError.classList.remove('show');
+    }
+}
+
+function showAuthOverlay(message = '') {
+    setAuthError(message);
+    els.authOverlay?.classList.remove('hidden');
+    els.authKey?.focus();
+}
+
+function hideAuthOverlay() {
+    setAuthError('');
+    if (els.authKey) els.authKey.value = '';
+    els.authOverlay?.classList.add('hidden');
+    unauthorizedHandled = false;
+}
+
+function logout(reason = 'Logged out') {
+    clearStoredProxyKey();
+    setAuthedUI(false);
+    showAuthOverlay(reason);
+}
+
+// Idle logout
+function resetIdleLogoutTimer() {
+    if (!IDLE_LOGOUT_MS) return;
+    if (getStoredProxyKeySource() !== 'session') return;
+
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => logout('Logged out due to inactivity'), IDLE_LOGOUT_MS);
+}
+
+function attachIdleLogoutListeners() {
+    if (idleListenersAttached) return;
+    idleListenersAttached = true;
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach((evt) => window.addEventListener(evt, resetIdleLogoutTimer, { passive: true }));
+}
+
+// Validation
+async function validateProxyKey(key) {
+    try {
+        const res = await fetch(`${API_BASE}/settings`, {
+            headers: { 'x-api-key': key }
+        });
+
+        if (res.ok) return { ok: true };
+
+        const data = await res.json().catch(() => null);
+        return { ok: false, message: data?.message || `Login failed (${res.status})` };
+    } catch {
+        return { ok: false, message: 'Unable to reach server' };
+    }
+}
+
+async function ensureAuthenticated() {
+    const key = getStoredProxyKey();
+    if (!key) {
+        setAuthedUI(false);
+        showAuthOverlay('');
+        return false;
+    }
+
+    const result = await validateProxyKey(key);
+    if (!result.ok) {
+        clearStoredProxyKey();
+        setAuthedUI(false);
+        showAuthOverlay(result.message || 'Unauthorized');
+        return false;
+    }
+
+    hideAuthOverlay();
+    setAuthedUI(true);
+    resetIdleLogoutTimer();
+    return true;
+}
 
 // SVG Icons
 const icons = {
@@ -40,30 +163,121 @@ const els = {
     modal: document.getElementById('modal'),
     form: document.getElementById('credentialForm'),
     status: document.getElementById('globalStatus'),
-    toastContainer: document.getElementById('toastContainer')
+    toastContainer: document.getElementById('toastContainer'),
+
+    authOverlay: document.getElementById('authOverlay'),
+    loginForm: document.getElementById('loginForm'),
+    authKey: document.getElementById('authKey'),
+    authRemember: document.getElementById('authRemember'),
+    authError: document.getElementById('authError')
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     updateThemeButton();
     document.getElementById('btnTheme')?.addEventListener('click', toggleTheme);
+    document.getElementById('btnLogout')?.addEventListener('click', () => logout('Logged out'));
     document.getElementById('strictModeToggle')?.addEventListener('change', toggleStrictMode);
     document.getElementById('quickGuideToggle')?.addEventListener('click', () => {
         document.getElementById('quickGuideCard').classList.toggle('collapsed');
     });
-    loadCredentials();
-    loadSettings();
+
+    // Login form submission
+    els.loginForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const key = els.authKey?.value?.trim();
+        const remember = !!els.authRemember?.checked;
+
+        if (!key) {
+            setAuthError('Please enter an admin key');
+            return;
+        }
+
+        setAuthError('');
+        const submitBtn = els.loginForm.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+            const result = await validateProxyKey(key);
+            if (!result.ok) {
+                setAuthError(result.message || 'Invalid admin key');
+                return;
+            }
+
+            setStoredProxyKey(key, remember);
+            hideAuthOverlay();
+            setAuthedUI(true);
+            showToast('Logged in successfully', 'success');
+            resetIdleLogoutTimer();
+
+            loadCredentials();
+            loadSettings();
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    });
+
+    // Toggle auth password visibility
+    document.querySelector('.toggle-auth-visibility')?.addEventListener('click', function() {
+        const input = els.authKey;
+        if (input) {
+            input.type = input.type === 'password' ? 'text' : 'password';
+            this.textContent = input.type === 'password' ? '👁️' : '🔒';
+        }
+    });
+
+    attachIdleLogoutListeners();
     checkStatus();
+
+    // Check auth on load
+    const authed = await ensureAuthenticated();
+    if (authed) {
+        loadCredentials();
+        loadSettings();
+    }
 });
+
+// API helper with auth
+const hasHeader = (headers, nameLower) => {
+    return Object.keys(headers || {}).some((k) => k.toLowerCase() === nameLower);
+};
 
 const api = async (endpoint, options = {}) => {
     const headers = { ...options.headers };
-    if (options.body) headers['Content-Type'] = 'application/json';
+
+    // Add auth header
+    const key = getStoredProxyKey();
+    if (key && !hasHeader(headers, 'x-api-key') && !hasHeader(headers, 'authorization')) {
+        headers['x-api-key'] = key;
+    }
+
+    if (options.body && !(options.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+    }
+
     try {
         const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
-        if (!res.ok) throw new Error((await res.json()).message || 'Request failed');
+
+        if (res.status === 401) {
+            const data = await res.json().catch(() => null);
+            if (!unauthorizedHandled) {
+                unauthorizedHandled = true;
+                logout(data?.message || 'Session expired');
+            }
+            const err = new Error(data?.message || 'Unauthorized');
+            err.silent = true;
+            throw err;
+        }
+
+        if (!res.ok) {
+            const data = await res.json().catch(() => null);
+            throw new Error(data?.message || 'Request failed');
+        }
+
+        resetIdleLogoutTimer();
         return await res.json();
     } catch (err) {
-        showToast(err.message, 'error');
+        if (!err?.silent) showToast(err.message || 'Request failed', 'error');
         throw err;
     }
 };
@@ -185,7 +399,6 @@ function renderList() {
     `).join('');
 }
 
-
 document.getElementById('btnAdd').addEventListener('click', () => openModal());
 document.getElementById('btnModalClose').addEventListener('click', closeModal);
 document.getElementById('btnCancel').addEventListener('click', closeModal);
@@ -227,7 +440,6 @@ function closeModal() {
     els.modal.classList.add('hidden');
     els.form.reset();
 }
-
 
 function showToast(msg, type = 'info') {
     const toast = document.createElement('div');

@@ -23,6 +23,7 @@
                         <span class="status-text">Checking...</span>
                     </div>
                     <button id="btnTheme" class="btn btn-sm btn-secondary" title="Toggle theme">🌙</button>
+                    <button id="btnLogout" class="btn btn-sm btn-secondary hidden" title="Log out">Logout</button>
                 </div>
             </div>
         </header>
@@ -129,6 +130,35 @@
         </div>
 
         <div id="toastContainer" class="toast-container"></div>
+
+        <!-- Admin Login Overlay -->
+        <div id="authOverlay" class="auth-overlay hidden">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <svg class="auth-logo" width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.5 2 2.5 6.5 2.5 12.5V21.5L12 17.5L21.5 21.5V12.5C21.5 6.5 17.5 2 12 2Z"/>
+                    </svg>
+                    <h2>Admin Access</h2>
+                    <p class="text-muted">Enter your admin key to continue</p>
+                </div>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <div class="input-group">
+                            <input type="password" id="authKey" required placeholder="Admin Key" autocomplete="current-password" spellcheck="false">
+                            <button type="button" class="btn-icon toggle-auth-visibility" tabindex="-1" title="Toggle visibility">👁️</button>
+                        </div>
+                        <div id="authError" class="auth-error" role="alert"></div>
+                    </div>
+                    <div class="auth-footer">
+                        <label class="remember-me">
+                            <input type="checkbox" id="authRemember">
+                            <span>Remember on this device</span>
+                        </label>
+                        <button type="submit" class="btn btn-primary">Unlock Panel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
     <script src="app.js?v=11"></script>
 </body>
