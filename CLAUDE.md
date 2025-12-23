@@ -28,8 +28,9 @@
 详细记录所有 session 的修复：
 - **Session 1+2**: 11 项 P0/P1/P2 修复（4 个 commit）
 - **Session 3**: 2 项 P0 Bug 修复 + Write-Only Key 模式（1 个 commit）
+- **Session 4**: Schema 验证移除 + 架构简化（1 个 commit）
 - Commit 记录、问题诊断、解决方案、测试结果
-- 代码质量改进统计（+402 行 / -105 行）
+- 代码质量改进统计（+403 行 / -170 行，净减 65 行）
 
 **查看方式**: 这两个文档已添加到 `.gitignore`，不会进入版本控制。
 
@@ -57,6 +58,12 @@ docker compose up -d --build
 ---
 
 ## 最近修复（2025-12-22）
+
+### Session 4: Schema 验证移除 🚀
+- **架构简化**: 移除过度设计的 schema 验证逻辑（65 行代码）
+- **问题修复**: SillyTavern 等客户端的合法请求不再被拦截
+- **设计哲学**: 代理回归本质（headers 伪装 + 请求转发），依赖上游 API 验证
+- **兼容性提升**: 零拦截风险，支持所有 Anthropic API 格式
 
 ### Session 3: Admin Panel 按钮失效修复 ⚡
 - **CSP 违规修复**: 移除内联 `onclick`，使用事件委托（所有按钮恢复正常）
@@ -111,10 +118,12 @@ docker compose up -d --build
 ## 下一步
 
 ### 已完成测试 ✅
-- [x] Docker 重建和部署（Session 3）
+- [x] Docker 重建和部署（Session 3 + 4）
 - [x] Admin Panel 按钮功能测试（编辑/删除/激活）
 - [x] Write-Only Key 安全模式测试
 - [x] CSP 兼容性验证
+- [x] Schema 验证移除测试（Session 4）
+- [x] SillyTavern 兼容性测试（真实客户端）
 
 ### 可选测试（下一个 session）
 - [ ] Admin 认证边界测试（完整覆盖）

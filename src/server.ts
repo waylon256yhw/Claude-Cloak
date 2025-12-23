@@ -22,6 +22,7 @@ const fastify = Fastify({
   logger: {
     level: config.logLevel,
   },
+  bodyLimit: 20 * 1024 * 1024, // 20MB - accommodate large PDFs/images (base64 encoded)
 })
 
 await fastify.register(helmet, {
