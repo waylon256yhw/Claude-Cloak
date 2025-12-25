@@ -13,6 +13,10 @@
   <em>A lightweight reverse proxy that cloaks API requests as Claude Code CLI format</em>
 </p>
 
+<p align="center">
+  English | <a href="README_CN.md">简体中文</a>
+</p>
+
 ---
 
 ## Features
