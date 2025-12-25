@@ -1,6 +1,11 @@
 import type { FastifyInstance } from 'fastify'
 
 export async function healthRoutes(fastify: FastifyInstance) {
+  // Redirect root to admin panel
+  fastify.get('/', async (request, reply) => {
+    return reply.redirect('/admin/')
+  })
+
   fastify.get('/healthz', async () => ({
     status: 'ok',
     service: 'claude-cloak',

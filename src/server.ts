@@ -59,8 +59,8 @@ await fastify.register(async (instance) => {
 
 const authHook = createAuthHook(config)
 fastify.addHook('preHandler', async (request, reply) => {
-  // Skip auth for health check endpoints
-  if (request.url === '/healthz' || request.url === '/health') {
+  // Skip auth for health check endpoints and root redirect
+  if (request.url === '/' || request.url === '/healthz' || request.url === '/health') {
     return
   }
 
