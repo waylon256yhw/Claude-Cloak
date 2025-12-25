@@ -22,6 +22,7 @@ spec:
     - **Multi-Credential Management**: Store and switch between API credentials
     - **Admin Panel**: Web UI for management at `/admin/`
     - **Streaming Support**: Full SSE streaming with backpressure handling
+    - **Parameter Normalization**: Automatically strips top_p/top_k to prevent upstream errors
 
     ## Configuration
 
@@ -92,6 +93,8 @@ spec:
             default: info
           STRICT_MODE:
             default: "true"
+          NORMALIZE_PARAMS:
+            default: "true"
       domainKey: PUBLIC_DOMAIN
       instructions:
         - type: DOMAIN
@@ -132,6 +135,7 @@ localization:
       - **多凭证管理**：存储和切换多个 API 凭证
       - **管理面板**：通过 `/admin/` 访问 Web 管理界面
       - **流式支持**：完整的 SSE 流式传输
+      - **参数规范化**：自动移除 top_p/top_k，防止上游错误
 
       ## 配置
 
