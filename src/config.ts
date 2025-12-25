@@ -10,7 +10,7 @@ function requireEnv(name: string): string {
 
 export function loadConfig(): Config {
   return {
-    port: parseInt(process.env.PORT || '3000', 10),
+    port: parseInt(process.env.PORT || '4000', 10),
     targetUrl: process.env.TARGET_URL || null,
     apiKey: process.env.API_KEY || null,
     proxyKey: requireEnv('PROXY_KEY'),

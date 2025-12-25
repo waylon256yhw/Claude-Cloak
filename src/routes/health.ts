@@ -12,7 +12,6 @@ export async function healthRoutes(fastify: FastifyInstance) {
     service: 'Claude Cloak',
     timestamp: new Date().toISOString(),
     endpoints: [
-      'POST /v1/chat/completions (OpenAI format)',
       'POST /v1/messages (Anthropic format)',
       'GET /v1/models (Model list)',
     ],

@@ -100,3 +100,11 @@ try {
   fastify.log.error(err)
   process.exit(1)
 }
+
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(signal, async () => {
+    console.log(`Received ${signal}, shutting down gracefully...`)
+    await fastify.close()
+    process.exit(0)
+  })
+}

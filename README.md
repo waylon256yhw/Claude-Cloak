@@ -44,6 +44,47 @@ docker compose up -d
 curl http://localhost:4000/healthz
 ```
 
+## Docker Image
+
+Pre-built images are available on GitHub Container Registry for easy deployment.
+
+[![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/CLAUDE-CLOAK)
+
+### Using Docker Run
+
+```bash
+docker run -d \
+  --name claude-cloak \
+  -p 4000:4000 \
+  -e TARGET_URL=https://api.anthropic.com \
+  -e API_KEY=sk-ant-xxx \
+  -e PROXY_KEY=your-secret \
+  -v ./data:/app/data \
+  ghcr.io/waylon256yhw/claude-cloak:latest
+```
+
+### Cloud Platform Deployment
+
+For Zeabur, ClawCloud, Railway, and similar platforms:
+
+| Setting | Value |
+|---------|-------|
+| Image | `ghcr.io/waylon256yhw/claude-cloak:latest` |
+| Port | `4000` |
+| Persistent Storage | Mount to `/app/data` |
+
+**Required Environment Variables:**
+- `TARGET_URL` - Upstream API base URL (e.g., `https://api.anthropic.com`)
+- `API_KEY` - Upstream API credential
+- `PROXY_KEY` - Admin panel authentication key
+
+**Optional Environment Variables:**
+- `PORT` - Listen port (default: `4000`)
+- `REQUEST_TIMEOUT` - Request timeout in ms (default: `60000`)
+- `LOG_LEVEL` - Log level: debug, info, warn, error (default: `info`)
+- `STRICT_MODE` - Strip user system messages (default: `true`)
+- `WARP_PROXY` - SOCKS5 proxy for IP obfuscation
+
 ## Supported Clients
 
 Any client that supports **Anthropic API format** can use this proxy:

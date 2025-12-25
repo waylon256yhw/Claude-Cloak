@@ -1,0 +1,153 @@
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: Claude Cloak
+spec:
+  description: Lightweight API proxy that cloaks requests as Claude Code CLI format
+  icon: https://raw.githubusercontent.com/waylon256yhw/Claude-Cloak/main/assets/logo.svg
+  coverImage: https://raw.githubusercontent.com/waylon256yhw/Claude-Cloak/main/assets/logo.svg
+  tags:
+    - Tool
+    - API
+    - Proxy
+  readme: |
+    # Claude Cloak
+
+    A lightweight reverse proxy that cloaks API requests as Claude Code CLI format.
+
+    ## Features
+
+    - **Request Cloaking**: Transforms requests to appear as Claude Code CLI
+    - **IP Obfuscation**: Optional WARP SOCKS5 proxy support
+    - **Multi-Credential Management**: Store and switch between API credentials
+    - **Admin Panel**: Web UI for management at `/admin/`
+    - **Streaming Support**: Full SSE streaming with backpressure handling
+
+    ## Configuration
+
+    After deployment, access the Admin Panel at `https://your-domain/admin/` using your `PROXY_KEY`.
+
+    ## Usage
+
+    ```bash
+    curl -X POST https://your-domain/v1/messages \
+      -H "Authorization: Bearer YOUR_PROXY_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "model": "claude-sonnet-4-20250514",
+        "max_tokens": 1024,
+        "messages": [{"role": "user", "content": "Hello"}]
+      }'
+    ```
+
+    ## Links
+
+    - [GitHub Repository](https://github.com/waylon256yhw/Claude-Cloak)
+    - [Documentation](https://github.com/waylon256yhw/Claude-Cloak#readme)
+
+  variables:
+    - key: TARGET_URL
+      type: STRING
+      name: Target URL
+      description: Upstream API base URL (e.g., https://api.anthropic.com)
+    - key: API_KEY
+      type: STRING
+      name: API Key
+      description: Upstream API credential
+    - key: PROXY_KEY
+      type: STRING
+      name: Proxy Key
+      description: Authentication key for accessing this proxy
+    - key: PUBLIC_DOMAIN
+      type: DOMAIN
+      name: Domain
+      description: Public domain for this service
+
+  services:
+    - name: claude-cloak
+      icon: https://raw.githubusercontent.com/waylon256yhw/Claude-Cloak/main/assets/logo.svg
+      template: PREBUILT
+      spec:
+        source:
+          image: ghcr.io/waylon256yhw/claude-cloak:latest
+        ports:
+          - id: web
+            port: 4000
+            type: HTTP
+        volumes:
+          - id: data
+            dir: /app/data
+        env:
+          TARGET_URL:
+            default: ${TARGET_URL}
+          API_KEY:
+            default: ${API_KEY}
+          PROXY_KEY:
+            default: ${PROXY_KEY}
+          PORT:
+            default: "4000"
+          LOG_LEVEL:
+            default: info
+          STRICT_MODE:
+            default: "true"
+      domainKey: PUBLIC_DOMAIN
+      instructions:
+        - type: DOMAIN
+          title: Proxy Endpoint
+          content: https://${PUBLIC_DOMAIN}/v1/messages
+        - type: DOMAIN
+          title: Admin Panel
+          content: https://${PUBLIC_DOMAIN}/admin/
+        - type: TEXT
+          title: Authentication
+          content: Use your PROXY_KEY as Bearer token or x-api-key header
+
+localization:
+  zh-CN:
+    description: 轻量级 API 代理，伪装请求为 Claude Code CLI 格式
+    variables:
+      - key: TARGET_URL
+        name: 上游 API 地址
+        description: 上游 API 基础 URL（例如 https://api.anthropic.com）
+      - key: API_KEY
+        name: API 密钥
+        description: 上游 API 凭证
+      - key: PROXY_KEY
+        name: 代理密钥
+        description: 访问此代理的认证密钥
+      - key: PUBLIC_DOMAIN
+        name: 域名
+        description: 服务的公开域名
+    readme: |
+      # Claude Cloak
+
+      轻量级反向代理，将 API 请求伪装为 Claude Code CLI 格式。
+
+      ## 功能特点
+
+      - **请求伪装**：将请求转换为 Claude Code CLI 格式
+      - **IP 混淆**：可选的 WARP SOCKS5 代理支持
+      - **多凭证管理**：存储和切换多个 API 凭证
+      - **管理面板**：通过 `/admin/` 访问 Web 管理界面
+      - **流式支持**：完整的 SSE 流式传输
+
+      ## 配置
+
+      部署后，使用 `PROXY_KEY` 访问管理面板 `https://your-domain/admin/`。
+
+      ## 使用方法
+
+      ```bash
+      curl -X POST https://your-domain/v1/messages \
+        -H "Authorization: Bearer YOUR_PROXY_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "model": "claude-sonnet-4-20250514",
+          "max_tokens": 1024,
+          "messages": [{"role": "user", "content": "Hello"}]
+        }'
+      ```
+
+      ## 链接
+
+      - [GitHub 仓库](https://github.com/waylon256yhw/Claude-Cloak)

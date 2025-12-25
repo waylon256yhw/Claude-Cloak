@@ -16,7 +16,8 @@ COPY --chown=node:node --from=builder /app/dist ./dist
 COPY --chown=node:node public ./public
 RUN mkdir -p data && chown node:node data
 USER node
-EXPOSE 3000
+ENV PORT=4000
+EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO- http://localhost:3000/healthz || exit 1
+  CMD wget -qO- http://localhost:${PORT:-4000}/healthz || exit 1
 CMD ["node", "dist/server.js"]
