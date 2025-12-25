@@ -78,6 +78,8 @@ spec:
           - id: data
             dir: /app/data
         env:
+          PASSWORD:
+            default: ""
           TARGET_URL:
             default: ${TARGET_URL}
           API_KEY:
