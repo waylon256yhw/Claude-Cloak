@@ -11,6 +11,7 @@
 - ✅ 流式传输（背压处理）
 - ✅ 多凭证管理（Web Admin Panel）
 - ✅ Strict Mode（系统提示词剥离）
+- ✅ 参数规范化（移除 top_p/top_k，防止上游错误）
 
 **技术栈**: TypeScript + Fastify + Docker
 
@@ -96,6 +97,7 @@ docker compose up -d --build
 | `REQUEST_TIMEOUT` | 请求超时（ms） | 60000 |
 | `LOG_LEVEL` | 日志级别 | info |
 | `WARP_PROXY` | SOCKS5 代理（可选） | - |
+| `NORMALIZE_PARAMS` | 启用参数规范化 | true |
 
 ---
 

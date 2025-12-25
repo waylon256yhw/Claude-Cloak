@@ -177,6 +177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnTheme')?.addEventListener('click', toggleTheme);
     document.getElementById('btnLogout')?.addEventListener('click', () => logout('Logged out'));
     document.getElementById('strictModeToggle')?.addEventListener('change', toggleStrictMode);
+    document.getElementById('normalizeParamsToggle')?.addEventListener('change', toggleNormalizeParams);
     document.getElementById('quickGuideToggle')?.addEventListener('click', () => {
         document.getElementById('quickGuideCard').classList.toggle('collapsed');
     });
@@ -354,6 +355,8 @@ async function loadSettings() {
         const settings = await api('/settings');
         const toggle = document.getElementById('strictModeToggle');
         if (toggle) toggle.checked = settings.strictMode;
+        const normalizeToggle = document.getElementById('normalizeParamsToggle');
+        if (normalizeToggle) normalizeToggle.checked = settings.normalizeParameters;
     } catch (e) {
         console.error('Failed to load settings:', e);
     }
@@ -364,6 +367,16 @@ async function toggleStrictMode(e) {
     try {
         await api('/settings', { method: 'PUT', body: JSON.stringify({ strictMode: enabled }) });
         showToast(`Strict Mode ${enabled ? 'enabled' : 'disabled'}`, 'success');
+    } catch (err) {
+        e.target.checked = !enabled;
+    }
+}
+
+async function toggleNormalizeParams(e) {
+    const enabled = e.target.checked;
+    try {
+        await api('/settings', { method: 'PUT', body: JSON.stringify({ normalizeParameters: enabled }) });
+        showToast(`Parameter Normalization ${enabled ? 'enabled' : 'disabled'}`, 'success');
     } catch (err) {
         e.target.checked = !enabled;
     }

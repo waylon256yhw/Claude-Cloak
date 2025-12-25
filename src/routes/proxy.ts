@@ -25,7 +25,7 @@ function getUpstreamConfig(config: Config): UpstreamConfig {
 export async function proxyRoutes(fastify: FastifyInstance, config: Config) {
   fastify.post('/v1/messages', async (request: FastifyRequest, reply: FastifyReply) => {
     const anthropicRequest = request.body as ClaudeRequest
-    const enhancedRequest = enhanceAnthropicRequest(anthropicRequest)
+    const enhancedRequest = enhanceAnthropicRequest(anthropicRequest, request.log)
     return proxyToClaude(config, enhancedRequest, request, reply)
   })
 }
