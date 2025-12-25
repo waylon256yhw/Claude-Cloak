@@ -48,7 +48,7 @@ curl http://localhost:4000/healthz
 
 Pre-built images are available on GitHub Container Registry for easy deployment.
 
-[![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/0KHVFA)
+[![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/0KHVFA?referralCode=waylon256yhw)
 
 ### Using Docker Run
 
