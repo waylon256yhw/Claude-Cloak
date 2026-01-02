@@ -70,7 +70,7 @@ export class SensitiveWordsStorage {
     const tmp = join(dir, `.sw-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`)
     const payload = JSON.stringify(store, null, 2)
     try {
-      await fs.writeFile(tmp, payload, { mode: 0o600 })
+      await fs.writeFile(tmp, payload, { mode: 0o644 })
       await fs.rename(tmp, this.path)
     } catch (err) {
       try {
