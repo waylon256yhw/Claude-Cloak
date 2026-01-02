@@ -4,6 +4,7 @@ import { credentialManager } from '../credentials/manager.js'
 import type { CreateCredentialInput, UpdateCredentialInput } from '../credentials/types.js'
 import { maskCredential } from '../credentials/types.js'
 import { settingsManager, type Settings } from '../settings/manager.js'
+import { sensitiveWordsManager } from '../sensitive-words/manager.js'
 
 interface IdParams {
   id: string
@@ -122,5 +123,71 @@ export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
     } catch (err) {
       reply.code(400).send({ error: 'Bad Request', message: (err as Error).message })
     }
+  })
+
+  // Sensitive Words endpoints
+  fastify.get('/sensitive-words', async () => {
+    return sensitiveWordsManager.getStore()
+  })
+
+  fastify.post<{ Body: { word: string } }>('/sensitive-words', async (request, reply) => {
+    const { word } = request.body || {}
+    if (!word || typeof word !== 'string') {
+      reply.code(400).send({ error: 'Bad Request', message: 'Missing required field: word' })
+      return
+    }
+    const entry = await sensitiveWordsManager.add(word)
+    if (!entry) {
+      reply.code(400).send({ error: 'Bad Request', message: 'Word too short (min 2 chars) or already exists' })
+      return
+    }
+    return entry
+  })
+
+  fastify.post<{ Body: { words: string[] } }>('/sensitive-words/batch', async (request, reply) => {
+    const { words } = request.body || {}
+    if (!Array.isArray(words)) {
+      reply.code(400).send({ error: 'Bad Request', message: 'words must be an array' })
+      return
+    }
+    return sensitiveWordsManager.addBatch(words)
+  })
+
+  fastify.put<{ Params: IdParams; Body: { word: string } }>('/sensitive-words/:id', async (request, reply) => {
+    const { word } = request.body || {}
+    if (!word || typeof word !== 'string') {
+      reply.code(400).send({ error: 'Bad Request', message: 'Missing required field: word' })
+      return
+    }
+    const entry = await sensitiveWordsManager.update(request.params.id, word)
+    if (!entry) {
+      reply.code(404).send({ error: 'Not Found', message: 'Word not found or invalid' })
+      return
+    }
+    return entry
+  })
+
+  fastify.delete<{ Params: IdParams }>('/sensitive-words/:id', async (request, reply) => {
+    const removed = await sensitiveWordsManager.remove(request.params.id)
+    if (!removed) {
+      reply.code(404).send({ error: 'Not Found', message: 'Word not found' })
+      return
+    }
+    return { success: true }
+  })
+
+  fastify.delete('/sensitive-words', async () => {
+    const count = await sensitiveWordsManager.clear()
+    return { success: true, cleared: count }
+  })
+
+  fastify.put<{ Body: { enabled: boolean } }>('/sensitive-words/settings', async (request, reply) => {
+    const { enabled } = request.body || {}
+    if (typeof enabled !== 'boolean') {
+      reply.code(400).send({ error: 'Bad Request', message: 'enabled must be boolean' })
+      return
+    }
+    await sensitiveWordsManager.setEnabled(enabled)
+    return { enabled }
   })
 }

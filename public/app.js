@@ -4,6 +4,9 @@ const AUTH_STORAGE_KEY = 'claude_admin_proxy_key';
 const IDLE_LOGOUT_MS = 30 * 60 * 1000; // 30 minutes, set to 0 to disable
 
 let credentials = [];
+let sensitiveWords = [];
+let wordsDisplayLimit = 50;
+const WORDS_PAGE_SIZE = 50;
 let idleTimer = null;
 let idleListenersAttached = false;
 let unauthorizedHandled = false;
@@ -178,6 +181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnLogout')?.addEventListener('click', () => logout('Logged out'));
     document.getElementById('strictModeToggle')?.addEventListener('change', toggleStrictMode);
     document.getElementById('normalizeParamsToggle')?.addEventListener('change', toggleNormalizeParams);
+    document.getElementById('sensitiveWordsToggle')?.addEventListener('change', toggleSensitiveWords);
     document.getElementById('quickGuideToggle')?.addEventListener('click', () => {
         document.getElementById('quickGuideCard').classList.toggle('collapsed');
     });
@@ -213,6 +217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             loadCredentials();
             loadSettings();
+            loadSensitiveWords();
         } finally {
             if (submitBtn) submitBtn.disabled = false;
         }
@@ -235,6 +240,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (authed) {
         loadCredentials();
         loadSettings();
+        loadSensitiveWords();
     }
 });
 
@@ -541,3 +547,209 @@ const esc = (str) => {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 };
+
+// --- SENSITIVE WORDS ---
+
+async function loadSensitiveWords() {
+    try {
+        const data = await api('/sensitive-words');
+        sensitiveWords = data.entries || [];
+        wordsDisplayLimit = WORDS_PAGE_SIZE; // Reset pagination
+        const toggle = document.getElementById('sensitiveWordsToggle');
+        if (toggle) toggle.checked = data.enabled !== false;
+        renderSensitiveWords();
+    } catch (e) {
+        console.error('Failed to load sensitive words:', e);
+    }
+}
+
+function renderSensitiveWords() {
+    const tbody = document.getElementById('sensitiveWordsList');
+    if (!tbody) return;
+
+    // Update count label
+    const countLabel = document.getElementById('wordsCountLabel');
+    if (countLabel) {
+        const count = sensitiveWords.length;
+        countLabel.textContent = count === 0 ? 'No words configured' :
+            count === 1 ? '1 word configured' : `${count} words configured`;
+    }
+
+    if (sensitiveWords.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="2" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">🛡️</div>
+                    <p>No sensitive words configured.</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    const visibleWords = sensitiveWords.slice(0, wordsDisplayLimit);
+    const hasMore = sensitiveWords.length > wordsDisplayLimit;
+
+    let html = visibleWords.map(word => `
+        <tr>
+            <td>
+                <span class="word-pattern">${esc(word.word)}</span>
+            </td>
+            <td>
+                <div class="actions-cell">
+                    <button class="btn-icon" data-word-action="edit" data-id="${word.id}" title="Edit">${icons.faders}</button>
+                    <button class="btn-icon btn-icon-danger" data-word-action="delete" data-id="${word.id}" title="Delete">${icons.trash}</button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+
+    if (hasMore) {
+        const remaining = sensitiveWords.length - wordsDisplayLimit;
+        html += `
+            <tr>
+                <td colspan="2" style="text-align: center; padding: 1rem;">
+                    <button class="btn btn-secondary btn-sm" id="btnLoadMoreWords">
+                        Load more (${remaining} remaining)
+                    </button>
+                </td>
+            </tr>
+        `;
+    }
+
+    tbody.innerHTML = html;
+}
+
+async function toggleSensitiveWords(e) {
+    const enabled = e.target.checked;
+    try {
+        await api('/sensitive-words/settings', { method: 'PUT', body: JSON.stringify({ enabled }) });
+        showToast(`Word Obfuscation ${enabled ? 'enabled' : 'disabled'}`, 'success');
+    } catch (err) {
+        e.target.checked = !enabled;
+    }
+}
+
+function openWordModal(word = null) {
+    const isEdit = !!word;
+    document.getElementById('wordModalTitle').textContent = isEdit ? 'Edit Word' : 'Add Word';
+    document.getElementById('wordEditId').value = word ? word.id : '';
+    document.getElementById('wordPattern').value = word ? word.word : '';
+    document.getElementById('wordModal').classList.remove('hidden');
+    document.getElementById('wordPattern').focus();
+}
+
+function closeWordModal() {
+    document.getElementById('wordModal').classList.add('hidden');
+    document.getElementById('wordForm').reset();
+}
+
+function closeImportModal() {
+    document.getElementById('importModal').classList.add('hidden');
+    document.getElementById('importForm').reset();
+}
+
+async function handleWordSubmit(e) {
+    e.preventDefault();
+    const id = document.getElementById('wordEditId').value;
+    const word = document.getElementById('wordPattern').value.trim();
+    if (!word) return;
+
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/sensitive-words/${id}` : '/sensitive-words';
+
+    try {
+        await api(url, { method, body: JSON.stringify({ word }) });
+        showToast(`Word ${id ? 'updated' : 'added'} successfully`, 'success');
+        closeWordModal();
+        loadSensitiveWords();
+    } catch (e) { /* handled by api() */ }
+}
+
+async function handleImportSubmit(e) {
+    e.preventDefault();
+    const text = document.getElementById('importText').value;
+    const words = text.split(/[\n,]+/).map(w => w.trim()).filter(w => w.length > 0);
+
+    if (words.length === 0) {
+        showToast('No valid words found to import', 'error');
+        return;
+    }
+
+    try {
+        const result = await api('/sensitive-words/batch', { method: 'POST', body: JSON.stringify({ words }) });
+        showToast(`Imported ${result.added} words (${result.skipped} skipped)`, 'success');
+        closeImportModal();
+        loadSensitiveWords();
+    } catch (e) { /* handled */ }
+}
+
+async function deleteWord(id) {
+    if (!await showConfirm({ title: 'Delete Word', message: 'Remove this sensitive word?', icon: 'trash', danger: true })) return;
+    try {
+        await api(`/sensitive-words/${id}`, { method: 'DELETE' });
+        showToast('Word deleted', 'success');
+        loadSensitiveWords();
+    } catch (e) { /* handled */ }
+}
+
+async function clearAllWords() {
+    if (!await showConfirm({
+        title: 'Clear All Words',
+        message: 'This will remove ALL sensitive words. This action cannot be undone.',
+        icon: 'warning',
+        danger: true
+    })) return;
+
+    try {
+        const result = await api('/sensitive-words', { method: 'DELETE' });
+        showToast(`Cleared ${result.cleared} words`, 'success');
+        loadSensitiveWords();
+    } catch (e) { /* handled */ }
+}
+
+// Sensitive words event listeners
+document.getElementById('btnAddWord')?.addEventListener('click', () => openWordModal());
+document.getElementById('btnWordModalClose')?.addEventListener('click', closeWordModal);
+document.getElementById('btnWordCancel')?.addEventListener('click', closeWordModal);
+document.getElementById('wordForm')?.addEventListener('submit', handleWordSubmit);
+
+document.getElementById('btnImportWords')?.addEventListener('click', () => {
+    document.getElementById('importModal').classList.remove('hidden');
+});
+document.getElementById('btnImportModalClose')?.addEventListener('click', closeImportModal);
+document.getElementById('btnImportCancel')?.addEventListener('click', closeImportModal);
+document.getElementById('importForm')?.addEventListener('submit', handleImportSubmit);
+
+document.getElementById('btnClearWords')?.addEventListener('click', clearAllWords);
+
+// Collapsible words list toggle
+document.getElementById('wordsListHeader')?.addEventListener('click', () => {
+    const card = document.querySelector('.collapsible-card');
+    const content = document.getElementById('wordsListContent');
+    if (card && content) {
+        card.classList.toggle('expanded');
+        content.classList.toggle('collapsed');
+    }
+});
+
+// Event delegation for sensitive words table
+document.getElementById('sensitiveWordsList')?.addEventListener('click', (e) => {
+    // Handle "Load more" button
+    if (e.target.id === 'btnLoadMoreWords') {
+        wordsDisplayLimit += WORDS_PAGE_SIZE;
+        renderSensitiveWords();
+        return;
+    }
+
+    const btn = e.target.closest('[data-word-action]');
+    if (!btn) return;
+    const action = btn.dataset.wordAction;
+    const id = btn.dataset.id;
+    if (action === 'edit') {
+        const word = sensitiveWords.find(w => w.id === id);
+        if (word) openWordModal(word);
+    } else if (action === 'delete') {
+        deleteWord(id);
+    }
+});

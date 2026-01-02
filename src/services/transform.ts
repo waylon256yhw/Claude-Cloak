@@ -7,6 +7,8 @@ import type {
 } from '../types.js'
 import { generateFakeUserId, isValidUserId } from './user.js'
 import { settingsManager } from '../settings/manager.js'
+import { sensitiveWordsManager } from '../sensitive-words/manager.js'
+import { obfuscateAnthropicRequest } from './obfuscate.js'
 
 const CLAUDE_CODE_SYSTEM_PROMPT: ClaudeSystemBlock = {
   type: 'text',
@@ -82,7 +84,7 @@ function normalizeAnthropicParams(request: ClaudeRequest, logger?: any): ClaudeR
   return normalized
 }
 
-export function enhanceAnthropicRequest(request: ClaudeRequest, logger?: any): ClaudeRequest {
+export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: any): Promise<ClaudeRequest> {
   let enhanced = { ...request }
 
   if (settingsManager.isStrictMode()) {
@@ -104,6 +106,15 @@ export function enhanceAnthropicRequest(request: ClaudeRequest, logger?: any): C
 
   if (settingsManager.getNormalizeParameters()) {
     enhanced = normalizeAnthropicParams(enhanced, logger)
+  }
+
+  try {
+    if (await sensitiveWordsManager.isEnabled()) {
+      const matcher = await sensitiveWordsManager.getCompiledMatcher()
+      enhanced = obfuscateAnthropicRequest(enhanced, matcher)
+    }
+  } catch (err) {
+    logger?.warn?.({ err }, 'Word obfuscation failed, continuing without obfuscation')
   }
 
   return enhanced
