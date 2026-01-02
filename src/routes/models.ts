@@ -4,6 +4,24 @@ import { buildStealthHeaders } from '../services/headers.js'
 import { credentialManager } from '../credentials/manager.js'
 import { getProxyDispatcher, undiciFetch } from '../services/socks.js'
 
+const FALLBACK_MODELS = {
+  object: 'list',
+  data: [
+    {
+      id: 'claude-opus-4-5-20251101',
+      object: 'model',
+      created: 1730419200,
+      owned_by: 'anthropic',
+    },
+    {
+      id: 'claude-sonnet-4-5-20250929',
+      object: 'model',
+      created: 1727568000,
+      owned_by: 'anthropic',
+    },
+  ],
+}
+
 export async function modelsRoutes(fastify: FastifyInstance, config: Config) {
   fastify.get('/v1/models', async (request, reply) => {
     const active = credentialManager.getActive()
@@ -11,25 +29,31 @@ export async function modelsRoutes(fastify: FastifyInstance, config: Config) {
     const apiKey = active?.apiKey || config.apiKey
 
     if (!targetUrl || !apiKey) {
-      reply.code(503).send({ error: 'Service Unavailable', message: 'No upstream credential configured' })
-      return
+      return reply.send(FALLBACK_MODELS)
     }
 
     const headers = buildStealthHeaders(apiKey)
 
-    const response = await undiciFetch(`${targetUrl}/v1/models`, {
-      method: 'GET',
-      headers,
-      dispatcher: getProxyDispatcher(),
-    })
+    try {
+      const response = await undiciFetch(`${targetUrl}/v1/models`, {
+        method: 'GET',
+        headers,
+        dispatcher: getProxyDispatcher(),
+      })
 
-    const data = await response.text()
+      if (response.ok) {
+        const data = await response.text()
+        reply.headers({
+          'Content-Type': response.headers.get('content-type') || 'application/json',
+          'X-Proxy-Status': 'forwarded',
+        })
+        return reply.send(data)
+      }
+    } catch {
+      // Upstream failed, use fallback
+    }
 
-    reply.code(response.status).headers({
-      'Content-Type': response.headers.get('content-type') || 'application/json',
-      'X-Proxy-Status': 'forwarded',
-    })
-
-    return reply.send(data)
+    reply.headers({ 'X-Proxy-Status': 'fallback' })
+    return reply.send(FALLBACK_MODELS)
   })
 }
