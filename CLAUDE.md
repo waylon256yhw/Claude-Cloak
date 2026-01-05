@@ -98,6 +98,7 @@ docker compose up -d --build
 | `LOG_LEVEL` | 日志级别 | info |
 | `WARP_PROXY` | SOCKS5 代理（可选） | - |
 | `NORMALIZE_PARAMS` | 启用参数规范化 | true |
+| `SENSITIVE_WORDS_MAX_ENTRIES` | 敏感词最大数量 | 20000 |
 
 ---
 

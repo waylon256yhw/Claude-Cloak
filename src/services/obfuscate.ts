@@ -10,8 +10,13 @@ function obfuscateMatch(m: string, zw: string): string {
 }
 
 export function obfuscateText(text: string, matcher: CompiledMatcher): string {
-  if (!matcher.regex) return text
-  return text.replace(matcher.regex, (m) => obfuscateMatch(m, matcher.zw))
+  if (!matcher.regexList?.length) return text
+
+  let result = text
+  for (const regex of matcher.regexList) {
+    result = result.replace(regex, (m) => obfuscateMatch(m, matcher.zw))
+  }
+  return result
 }
 
 type ContentBlock = { type: string; text?: string; content?: unknown; [key: string]: unknown }
@@ -76,7 +81,7 @@ export function obfuscateAnthropicRequest(
   request: ClaudeRequest,
   matcher: CompiledMatcher
 ): ClaudeRequest {
-  if (!matcher.regex) return request
+  if (!matcher.regexList?.length) return request
 
   const result = { ...request }
 

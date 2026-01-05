@@ -13,6 +13,6 @@ export interface SensitiveWordsStore {
 }
 
 export interface CompiledMatcher {
-  regex?: RegExp
+  regexList?: RegExp[]
   zw: string
 }

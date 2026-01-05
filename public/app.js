@@ -6,6 +6,8 @@ const IDLE_LOGOUT_MS = 30 * 60 * 1000; // 30 minutes, set to 0 to disable
 let credentials = [];
 let sensitiveWords = [];
 let wordsDisplayLimit = 50;
+let wordsSearchQuery = '';
+let wordsSearchTimer = null;
 const WORDS_PAGE_SIZE = 50;
 let idleTimer = null;
 let idleListenersAttached = false;
@@ -555,40 +557,83 @@ async function loadSensitiveWords() {
         const data = await api('/sensitive-words');
         sensitiveWords = data.entries || [];
         wordsDisplayLimit = WORDS_PAGE_SIZE; // Reset pagination
+        wordsSearchQuery = ''; // Reset search
+        const searchInput = document.getElementById('wordsSearchInput');
+        if (searchInput) searchInput.value = ''; // Sync input with state
         const toggle = document.getElementById('sensitiveWordsToggle');
         if (toggle) toggle.checked = data.enabled !== false;
+        ensureWordsSearchInput();
         renderSensitiveWords();
     } catch (e) {
         console.error('Failed to load sensitive words:', e);
     }
 }
 
+function ensureWordsSearchInput() {
+    if (document.getElementById('wordsSearchInput')) return;
+    const content = document.getElementById('wordsListContent');
+    if (!content) return;
+
+    const searchDiv = document.createElement('div');
+    searchDiv.className = 'words-search';
+    searchDiv.style.cssText = 'margin-bottom: 0.75rem;';
+    searchDiv.innerHTML = `
+        <input type="text" id="wordsSearchInput"
+               placeholder="Search words..."
+               class="form-input" style="width: 100%;">
+    `;
+    content.insertBefore(searchDiv, content.firstChild);
+
+    const input = document.getElementById('wordsSearchInput');
+    input.addEventListener('input', (e) => {
+        clearTimeout(wordsSearchTimer);
+        wordsSearchTimer = setTimeout(() => {
+            wordsSearchQuery = e.target.value.toLowerCase().trim();
+            wordsDisplayLimit = WORDS_PAGE_SIZE;
+            renderSensitiveWords();
+        }, 200);
+    });
+}
+
 function renderSensitiveWords() {
     const tbody = document.getElementById('sensitiveWordsList');
     if (!tbody) return;
 
+    // Apply search filter
+    let filtered = sensitiveWords;
+    if (wordsSearchQuery) {
+        filtered = sensitiveWords.filter(w =>
+            w.word.toLowerCase().includes(wordsSearchQuery)
+        );
+    }
+
     // Update count label
     const countLabel = document.getElementById('wordsCountLabel');
     if (countLabel) {
-        const count = sensitiveWords.length;
-        countLabel.textContent = count === 0 ? 'No words configured' :
-            count === 1 ? '1 word configured' : `${count} words configured`;
+        const total = sensitiveWords.length;
+        const shown = filtered.length;
+        if (wordsSearchQuery && shown !== total) {
+            countLabel.textContent = `${shown} / ${total} words (filtered)`;
+        } else {
+            countLabel.textContent = total === 0 ? 'No words configured' :
+                total === 1 ? '1 word configured' : `${total} words configured`;
+        }
     }
 
-    if (sensitiveWords.length === 0) {
+    if (filtered.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="2" style="text-align: center; padding: 3rem; color: var(--text-muted);">
-                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">🛡️</div>
-                    <p>No sensitive words configured.</p>
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">${wordsSearchQuery ? '🔍' : '🛡️'}</div>
+                    <p>${wordsSearchQuery ? 'No matching words found.' : 'No sensitive words configured.'}</p>
                 </td>
             </tr>
         `;
         return;
     }
 
-    const visibleWords = sensitiveWords.slice(0, wordsDisplayLimit);
-    const hasMore = sensitiveWords.length > wordsDisplayLimit;
+    const visibleWords = filtered.slice(0, wordsDisplayLimit);
+    const hasMore = filtered.length > wordsDisplayLimit;
 
     let html = visibleWords.map(word => `
         <tr>
@@ -605,7 +650,7 @@ function renderSensitiveWords() {
     `).join('');
 
     if (hasMore) {
-        const remaining = sensitiveWords.length - wordsDisplayLimit;
+        const remaining = filtered.length - wordsDisplayLimit;
         html += `
             <tr>
                 <td colspan="2" style="text-align: center; padding: 1rem;">

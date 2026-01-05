@@ -176,6 +176,16 @@ export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
     return { success: true }
   })
 
+  fastify.delete<{ Body: { ids: string[] } }>('/sensitive-words/batch', async (request, reply) => {
+    const { ids } = request.body || {}
+    if (!Array.isArray(ids)) {
+      reply.code(400).send({ error: 'Bad Request', message: 'ids must be an array' })
+      return
+    }
+    const removed = await sensitiveWordsManager.removeBatch(ids)
+    return { success: true, removed }
+  })
+
   fastify.delete('/sensitive-words', async () => {
     const count = await sensitiveWordsManager.clear()
     return { success: true, cleared: count }

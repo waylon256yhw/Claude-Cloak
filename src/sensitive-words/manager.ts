@@ -3,18 +3,25 @@ import type { SensitiveWordEntry, SensitiveWordsStore, CompiledMatcher } from '.
 import { SensitiveWordsStorage } from './storage.js'
 import { graphemes, graphemeLength, containsZW, ZW } from './grapheme.js'
 
-const MAX_ENTRIES = 1000
+const MAX_ENTRIES = Math.max(100, parseInt(process.env.SENSITIVE_WORDS_MAX_ENTRIES || '20000', 10) || 20000)
 const MAX_WORD_LENGTH = 100
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+const REGEX_CHUNK_SIZE = 500
+
 class SensitiveWordsManager {
   private storage = new SensitiveWordsStorage()
   private store: SensitiveWordsStore | null = null
   private matcher: CompiledMatcher | null = null
   private initPromise: Promise<void> | null = null
+  private wordIndex: Map<string, string> = new Map() // normalized -> entry id
+
+  private normalizeForIndex(word: string): string {
+    return word.normalize('NFKC').toLowerCase()
+  }
 
   private async ensureLoaded(): Promise<void> {
     if (this.store) return
@@ -36,18 +43,25 @@ class SensitiveWordsManager {
   }
 
   private rebuildMatcher(): void {
+    this.wordIndex.clear()
+
     if (!this.store || this.store.entries.length === 0) {
       this.matcher = { zw: ZW }
       return
     }
 
-    const wordsWithLength = this.store.entries
-      .map((e) => {
-        const normalized = e.word.normalize('NFKC')
-        return { word: normalized, len: graphemeLength(normalized) }
-      })
-      .filter((w) => w.len >= 2)
+    // Build index and collect words for regex
+    const wordsWithLength: { word: string; len: number }[] = []
+    for (const entry of this.store.entries) {
+      const normalized = entry.word.normalize('NFKC')
+      const len = graphemeLength(normalized)
+      this.wordIndex.set(this.normalizeForIndex(entry.word), entry.id)
+      if (len >= 2) {
+        wordsWithLength.push({ word: normalized, len })
+      }
+    }
 
+    // Dedupe by lowercase and sort by length (longest first for greedy matching)
     const uniq = [...new Map(wordsWithLength.map((w) => [w.word.toLowerCase(), w])).values()]
     uniq.sort((a, b) => b.len - a.len)
 
@@ -56,10 +70,15 @@ class SensitiveWordsManager {
       return
     }
 
-    this.matcher = {
-      regex: new RegExp(uniq.map((w) => escapeRegExp(w.word)).join('|'), 'giu'),
-      zw: ZW,
+    // Chunk into groups to avoid regex complexity issues
+    const regexList: RegExp[] = []
+    for (let i = 0; i < uniq.length; i += REGEX_CHUNK_SIZE) {
+      const chunk = uniq.slice(i, i + REGEX_CHUNK_SIZE)
+      const pattern = chunk.map((w) => escapeRegExp(w.word)).join('|')
+      regexList.push(new RegExp(pattern, 'giu'))
     }
+
+    this.matcher = { regexList, zw: ZW }
   }
 
   async isEnabled(): Promise<boolean> {
@@ -93,10 +112,10 @@ class SensitiveWordsManager {
   }
 
   private isDuplicate(word: string, excludeId?: string): boolean {
-    const normalized = word.normalize('NFKC').toLowerCase()
-    return this.store!.entries.some(
-      (e) => e.id !== excludeId && e.word.normalize('NFKC').toLowerCase() === normalized
-    )
+    const normalized = this.normalizeForIndex(word)
+    const existingId = this.wordIndex.get(normalized)
+    if (!existingId) return false
+    return existingId !== excludeId
   }
 
   async add(word: string): Promise<SensitiveWordEntry | null> {
@@ -126,6 +145,7 @@ class SensitiveWordsManager {
 
     let added = 0
     let skipped = 0
+    const batchSeen = new Set<string>() // Track duplicates within batch
 
     for (const word of words) {
       if (this.store!.entries.length >= MAX_ENTRIES) {
@@ -138,17 +158,22 @@ class SensitiveWordsManager {
         skipped++
         continue
       }
-      if (this.isDuplicate(validated)) {
+
+      const normalized = this.normalizeForIndex(validated)
+      if (this.isDuplicate(validated) || batchSeen.has(normalized)) {
         skipped++
         continue
       }
 
+      batchSeen.add(normalized)
+      const id = randomUUID()
       this.store!.entries.push({
-        id: randomUUID(),
+        id,
         word: validated,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       })
+      this.wordIndex.set(normalized, id) // Update index immediately
       added++
     }
 
@@ -191,6 +216,22 @@ class SensitiveWordsManager {
     this.rebuildMatcher()
     await this.save()
     return true
+  }
+
+  async removeBatch(ids: string[]): Promise<number> {
+    await this.ensureLoaded()
+
+    const idSet = new Set(ids)
+    const originalLength = this.store!.entries.length
+    this.store!.entries = this.store!.entries.filter((e) => !idSet.has(e.id))
+    const removed = originalLength - this.store!.entries.length
+
+    if (removed > 0) {
+      this.rebuildMatcher()
+      await this.save()
+    }
+
+    return removed
   }
 
   async clear(): Promise<number> {
