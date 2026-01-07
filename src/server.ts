@@ -12,6 +12,10 @@ import { adminRoutes } from './routes/admin.js'
 import { credentialManager } from './credentials/manager.js'
 import { initSocksProxy } from './services/socks.js'
 
+const MAX_BODY_SIZE = 20 * 1024 * 1024 // 20MB - accommodate large PDFs/images (base64 encoded)
+const RATE_LIMIT_MAX = 100
+const RATE_LIMIT_WINDOW = '1 minute'
+
 const config = loadConfig()
 
 initSocksProxy(config)
@@ -22,7 +26,7 @@ const fastify = Fastify({
   logger: {
     level: config.logLevel,
   },
-  bodyLimit: 20 * 1024 * 1024, // 20MB - accommodate large PDFs/images (base64 encoded)
+  bodyLimit: MAX_BODY_SIZE,
 })
 
 await fastify.register(helmet, {
@@ -41,8 +45,8 @@ await fastify.register(helmet, {
   },
 })
 await fastify.register(rateLimit, {
-  max: 100,
-  timeWindow: '1 minute',
+  max: RATE_LIMIT_MAX,
+  timeWindow: RATE_LIMIT_WINDOW,
 })
 
 await fastify.register(healthRoutes)

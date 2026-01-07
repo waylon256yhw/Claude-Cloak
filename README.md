@@ -30,6 +30,8 @@
 - **SSE Streaming**: Full support for streaming responses with backpressure handling
 - **Multi-Credential Management**: Store multiple upstream API credentials, switch at runtime
 - **Strict Mode**: Strip all user system messages, keep only Claude Code prompt
+- **Sensitive Word Obfuscation**: Automatically obfuscate configurable sensitive words in requests
+- **Parameter Normalization**: Strip unsupported parameters (top_p/top_k) to prevent upstream errors
 - **Admin Panel**: Web UI for credential and settings management (authentication required)
 - **Docker Ready**: One-command deployment with Docker Compose
 
@@ -87,6 +89,8 @@ For Zeabur, ClawCloud, Railway, and similar platforms:
 - `REQUEST_TIMEOUT` - Request timeout in ms (default: `60000`)
 - `LOG_LEVEL` - Log level: debug, info, warn, error (default: `info`)
 - `STRICT_MODE` - Strip user system messages (default: `true`)
+- `NORMALIZE_PARAMS` - Normalize API parameters (default: `true`)
+- `SENSITIVE_WORDS_MAX_ENTRIES` - Max sensitive word entries (default: `20000`)
 - `WARP_PROXY` - SOCKS5 proxy for IP obfuscation
 
 ## Supported Clients
@@ -330,11 +334,17 @@ claude-cloak/
 │   │   ├── transform.ts    # Format conversion
 │   │   ├── stream.ts       # SSE handling
 │   │   ├── user.ts         # User ID generation
-│   │   └── socks.ts        # WARP SOCKS5 proxy
+│   │   ├── socks.ts        # WARP SOCKS5 proxy
+│   │   └── obfuscate.ts    # Sensitive word obfuscation
 │   ├── credentials/
 │   │   ├── manager.ts      # Credential CRUD operations
 │   │   ├── storage.ts      # JSON file persistence
 │   │   └── types.ts        # Credential types
+│   ├── sensitive-words/
+│   │   ├── manager.ts      # Sensitive words CRUD and matching
+│   │   ├── storage.ts      # JSON file persistence
+│   │   ├── types.ts        # Word entry types
+│   │   └── grapheme.ts     # Unicode grapheme utilities
 │   └── settings/
 │       └── manager.ts      # Runtime settings (Strict Mode)
 ├── public/                 # Admin Panel frontend

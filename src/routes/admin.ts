@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { Config } from '../types.js'
 import { credentialManager } from '../credentials/manager.js'
 import type { CreateCredentialInput, UpdateCredentialInput } from '../credentials/types.js'
@@ -10,18 +10,24 @@ interface IdParams {
   id: string
 }
 
-// Detect if a key looks like a masked value (e.g., "...abcd" or "****")
 function looksLikeMaskedKey(key: string): boolean {
   if (!key) return false
   const trimmed = key.trim()
   return /^\.{3,}/.test(trimmed) || /^\*{3,}$/.test(trimmed)
 }
 
-export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
+function handleCrudError(reply: FastifyReply, err: unknown): void {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (msg.includes('not found')) {
+    reply.code(404).send({ error: 'Not Found', message: msg })
+  } else {
+    reply.code(500).send({ error: 'Internal Server Error', message: msg })
+  }
+}
 
+async function registerCredentialRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/credentials', async () => {
     const credentials = credentialManager.getAll()
-    // Mask API keys in list view for security
     return credentials.map(maskCredential)
   })
 
@@ -31,7 +37,6 @@ export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
       reply.code(404).send({ error: 'Not Found', message: 'Credential not found' })
       return
     }
-    // Mask API key for security
     return maskCredential(cred)
   })
 
@@ -63,12 +68,7 @@ export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
       const updated = await credentialManager.update(request.params.id, request.body || {})
       return maskCredential(updated)
     } catch (err) {
-      const msg = (err as Error).message
-      if (msg.includes('not found')) {
-        reply.code(404).send({ error: 'Not Found', message: msg })
-      } else {
-        reply.code(500).send({ error: 'Internal Server Error', message: msg })
-      }
+      handleCrudError(reply, err)
     }
   })
 
@@ -77,12 +77,7 @@ export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
       await credentialManager.remove(request.params.id)
       return { success: true }
     } catch (err) {
-      const msg = (err as Error).message
-      if (msg.includes('not found')) {
-        reply.code(404).send({ error: 'Not Found', message: msg })
-      } else {
-        reply.code(500).send({ error: 'Internal Server Error', message: msg })
-      }
+      handleCrudError(reply, err)
     }
   })
 
@@ -90,12 +85,7 @@ export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
     try {
       return await credentialManager.activate(request.params.id)
     } catch (err) {
-      const msg = (err as Error).message
-      if (msg.includes('not found')) {
-        reply.code(404).send({ error: 'Not Found', message: msg })
-      } else {
-        reply.code(500).send({ error: 'Internal Server Error', message: msg })
-      }
+      handleCrudError(reply, err)
     }
   })
 
@@ -107,7 +97,9 @@ export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
     }
     return { id: active.id, name: active.name, targetUrl: active.targetUrl }
   })
+}
 
+async function registerSettingsRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/settings', async () => {
     return settingsManager.getAll()
   })
@@ -124,8 +116,9 @@ export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
       reply.code(400).send({ error: 'Bad Request', message: (err as Error).message })
     }
   })
+}
 
-  // Sensitive Words endpoints
+async function registerSensitiveWordsRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/sensitive-words', async () => {
     return sensitiveWordsManager.getStore()
   })
@@ -200,4 +193,10 @@ export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
     await sensitiveWordsManager.setEnabled(enabled)
     return { enabled }
   })
+}
+
+export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
+  await registerCredentialRoutes(fastify)
+  await registerSettingsRoutes(fastify)
+  await registerSensitiveWordsRoutes(fastify)
 }

@@ -8,25 +8,6 @@ export interface Config {
   warpProxy: string | null
 }
 
-export interface OpenAIMessage {
-  role: 'system' | 'user' | 'assistant'
-  content: string | ContentPart[]
-}
-
-export interface ContentPart {
-  type: 'text' | 'image_url'
-  text?: string
-  image_url?: { url: string }
-}
-
-export interface OpenAIChatRequest {
-  model?: string
-  messages: OpenAIMessage[]
-  max_tokens?: number
-  temperature?: number
-  stream?: boolean
-}
-
 export interface ClaudeSystemBlock {
   type: 'text'
   text: string

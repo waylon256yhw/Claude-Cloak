@@ -36,13 +36,19 @@ export interface CredentialSafe {
   updatedAt: string
 }
 
+const MIN_KEY_LENGTH_FOR_MASKING = 8
+const VISIBLE_KEY_SUFFIX_LENGTH = 4
+
 export function maskCredential(cred: Credential): CredentialSafe {
-  const last4 = cred.apiKey.length >= 4 ? cred.apiKey.slice(-4) : cred.apiKey
+  const keyLength = cred.apiKey.length
+  const last4 = keyLength >= MIN_KEY_LENGTH_FOR_MASKING
+    ? cred.apiKey.slice(-VISIBLE_KEY_SUFFIX_LENGTH)
+    : ''
   return {
     id: cred.id,
     name: cred.name,
     targetUrl: cred.targetUrl,
-    keyMasked: cred.apiKey.length > 8 ? `...${last4}` : '****',
+    keyMasked: keyLength >= MIN_KEY_LENGTH_FOR_MASKING ? `...${last4}` : '****',
     keyLast4: last4,
     isActive: cred.isActive,
     createdAt: cred.createdAt,
