@@ -1,7 +1,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+COPY package.json ./
+RUN npm install
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
@@ -10,8 +10,8 @@ FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apk add --no-cache wget && chown -R node:node /app
-COPY --chown=node:node package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+COPY --chown=node:node package.json ./
+RUN npm install --omit=dev && npm cache clean --force
 COPY --chown=node:node --from=builder /app/dist ./dist
 COPY --chown=node:node public ./public
 RUN mkdir -p data && chown node:node data
