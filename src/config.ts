@@ -1,11 +1,11 @@
 import type { Config } from './types.js'
 
 function requireEnv(name: string): string {
-  const value = process.env[name]
-  if (!value) {
+  const envValue = process.env[name]
+  if (!envValue) {
     throw new Error(`Missing required environment variable: ${name}`)
   }
-  return value
+  return envValue
 }
 
 export function loadConfig(): Config {

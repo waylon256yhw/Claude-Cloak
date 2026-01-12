@@ -65,10 +65,12 @@ export interface ClaudeTool {
 export interface ClaudeRequest {
   model: string
   max_tokens: number
-  system?: ClaudeSystemBlock[]
+  system?: ClaudeSystemBlock[] | string
   messages: ClaudeMessage[]
   tools?: ClaudeTool[]
   metadata?: { user_id: string }
   temperature?: number
+  top_p?: number
+  top_k?: number
   stream?: boolean
 }

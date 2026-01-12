@@ -7,12 +7,17 @@ import { settingsManager } from '../settings/manager.js'
 import { sensitiveWordsManager } from '../sensitive-words/manager.js'
 import { obfuscateAnthropicRequest } from './obfuscate.js'
 
+type LoggerLike = {
+  debug?: (obj: unknown, msg?: string) => void
+  warn?: (obj: unknown, msg?: string) => void
+}
+
 const CLAUDE_CODE_SYSTEM_PROMPT: ClaudeSystemBlock = {
   type: 'text',
   text: "You are Claude Code, Anthropic's official CLI for Claude.",
 }
 
-function normalizeAnthropicParams(request: ClaudeRequest, logger?: any): ClaudeRequest {
+function normalizeAnthropicParams(request: ClaudeRequest, logger?: LoggerLike): ClaudeRequest {
   const normalized = { ...request }
   const strippedKeys: string[] = []
 
@@ -32,7 +37,7 @@ function normalizeAnthropicParams(request: ClaudeRequest, logger?: any): ClaudeR
   return normalized
 }
 
-export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: any): Promise<ClaudeRequest> {
+export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: LoggerLike): Promise<ClaudeRequest> {
   let enhanced = { ...request }
 
   if (settingsManager.isStrictMode()) {
