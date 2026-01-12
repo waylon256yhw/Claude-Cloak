@@ -4,7 +4,6 @@ import { buildStealthHeaders } from '../services/headers.js'
 import { enhanceAnthropicRequest } from '../services/transform.js'
 import { pipeStream } from '../services/stream.js'
 import { credentialManager } from '../credentials/manager.js'
-import { getProxyDispatcher, isProxyError, undiciFetch } from '../services/socks.js'
 
 interface UpstreamConfig {
   targetUrl: string
@@ -58,12 +57,11 @@ async function proxyToClaude(
   const initialTimeout = setTimeout(() => controller.abort(), config.requestTimeout)
 
   try {
-    const response = await undiciFetch(`${upstream.targetUrl}/v1/messages`, {
+    const response = await fetch(`${upstream.targetUrl}/v1/messages`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
       signal: controller.signal,
-      dispatcher: getProxyDispatcher(),
     })
 
     clearTimeout(initialTimeout)
@@ -104,11 +102,6 @@ async function proxyToClaude(
     const error = err as Error & { code?: string; cause?: { code?: string } }
     if (error.name === 'AbortError') {
       reply.code(504).send({ error: 'Gateway Timeout', message: 'Upstream request timed out' })
-      return
-    }
-    if (isProxyError(error)) {
-      request.log.error({ err: error }, 'WARP proxy connection failed')
-      reply.code(502).send({ error: 'Bad Gateway', message: 'Proxy unavailable' })
       return
     }
     throw err

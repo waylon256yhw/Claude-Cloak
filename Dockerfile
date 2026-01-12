@@ -1,23 +1,23 @@
-FROM node:20-alpine AS builder
+FROM oven/bun:1 AS builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build
+RUN bun run build
 
-FROM node:20-alpine
+FROM oven/bun:1-alpine
 WORKDIR /app
 ENV NODE_ENV=production
-RUN apk add --no-cache wget && chown -R node:node /app
-COPY --chown=node:node package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-COPY --chown=node:node --from=builder /app/dist ./dist
-COPY --chown=node:node public ./public
-RUN mkdir -p data && chown node:node data
-USER node
+RUN apk add --no-cache wget && chown -R bun:bun /app
+COPY --chown=bun:bun package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+COPY --chown=bun:bun --from=builder /app/dist ./dist
+COPY --chown=bun:bun public ./public
+RUN mkdir -p data && chown bun:bun data
+USER bun
 ENV PORT=4000
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:${PORT:-4000}/healthz || exit 1
-CMD ["node", "dist/server.js"]
+CMD ["bun", "dist/server.js"]

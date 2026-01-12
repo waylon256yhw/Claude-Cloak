@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify'
 import type { Config } from '../types.js'
 import { buildStealthHeaders } from '../services/headers.js'
 import { credentialManager } from '../credentials/manager.js'
-import { getProxyDispatcher, undiciFetch } from '../services/socks.js'
 
 const FALLBACK_MODELS = {
   object: 'list',
@@ -35,10 +34,9 @@ export async function modelsRoutes(fastify: FastifyInstance, config: Config) {
     const headers = buildStealthHeaders(apiKey)
 
     try {
-      const response = await undiciFetch(`${targetUrl}/v1/models`, {
+      const response = await fetch(`${targetUrl}/v1/models`, {
         method: 'GET',
         headers,
-        dispatcher: getProxyDispatcher(),
       })
 
       if (response.ok) {

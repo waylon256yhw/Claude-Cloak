@@ -5,7 +5,6 @@
 
 **核心功能**:
 - ✅ 请求伪装（Claude Code CLI headers）
-- ✅ IP 混淆（WARP SOCKS5 代理）
 - ✅ Tool Calling 完整支持
 - ✅ 多模态内容（文本+图片）
 - ✅ 流式传输（背压处理）
@@ -13,7 +12,7 @@
 - ✅ Strict Mode（系统提示词剥离）
 - ✅ 参数规范化（移除 top_p/top_k，防止上游错误）
 
-**技术栈**: TypeScript + Fastify + Docker
+**技术栈**: TypeScript + Fastify + Bun + Docker
 
 ---
 
@@ -41,9 +40,9 @@
 
 ### 开发环境
 ```bash
-npm install
-npm run build
-npm start
+bun install
+bun run build
+bun start
 ```
 
 ### Docker 部署
@@ -96,7 +95,6 @@ docker compose up -d --build
 | `PROXY_KEY` | Admin 认证密钥 | - |
 | `REQUEST_TIMEOUT` | 请求超时（ms） | 60000 |
 | `LOG_LEVEL` | 日志级别 | info |
-| `WARP_PROXY` | SOCKS5 代理（可选） | - |
 | `NORMALIZE_PARAMS` | 启用参数规范化 | true |
 | `SENSITIVE_WORDS_MAX_ENTRIES` | 敏感词最大数量 | 20000 |
 

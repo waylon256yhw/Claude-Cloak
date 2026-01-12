@@ -10,15 +10,12 @@ import { modelsRoutes } from './routes/models.js'
 import { proxyRoutes } from './routes/proxy.js'
 import { adminRoutes } from './routes/admin.js'
 import { credentialManager } from './credentials/manager.js'
-import { initSocksProxy } from './services/socks.js'
 
 const MAX_BODY_SIZE = 20 * 1024 * 1024 // 20MB - accommodate large PDFs/images (base64 encoded)
 const RATE_LIMIT_MAX = 100
 const RATE_LIMIT_WINDOW = '1 minute'
 
 const config = loadConfig()
-
-initSocksProxy(config)
 
 await credentialManager.init()
 
