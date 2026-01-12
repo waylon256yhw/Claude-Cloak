@@ -6,6 +6,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/隐身代理-0d9488?style=for-the-badge" alt="Stealth Proxy"/>
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/>
+  <img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"/>
   <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"/>
 </p>
 
@@ -22,7 +23,6 @@
 ## 功能特性
 
 - **请求伪装**：将所有请求转换为 Claude Code CLI 格式
-- **IP 混淆**：通过 Cloudflare WARP SOCKS5 代理转发上游请求
 - **原生 Anthropic 格式**：完整支持 Anthropic API，包括工具调用和多模态内容
 - **双重认证**：支持 `Authorization: Bearer` 和 `x-api-key` 头部
 - **系统提示注入**：自动注入 Claude Code 身份标识
@@ -30,6 +30,8 @@
 - **SSE 流式传输**：完整支持流式响应，带背压处理
 - **多凭证管理**：存储多个上游 API 凭证，运行时切换
 - **严格模式**：剥离所有用户系统消息，仅保留 Claude Code 提示
+- **敏感词混淆**：自动混淆可配置的敏感词
+- **参数规范化**：剥离不支持的参数（top_p/top_k）防止上游错误
 - **管理面板**：Web UI 管理凭证和设置（需要认证）
 - **Docker 就绪**：一键 Docker Compose 部署
 
@@ -87,7 +89,8 @@ docker run -d \
 - `REQUEST_TIMEOUT` - 请求超时毫秒数（默认：`60000`）
 - `LOG_LEVEL` - 日志级别：debug, info, warn, error（默认：`info`）
 - `STRICT_MODE` - 剥离用户系统消息（默认：`true`）
-- `WARP_PROXY` - IP 混淆用 SOCKS5 代理
+- `NORMALIZE_PARAMS` - 规范化 API 参数（默认：`true`）
+- `SENSITIVE_WORDS_MAX_ENTRIES` - 敏感词最大数量（默认：`20000`）
 
 ## 支持的客户端
 
@@ -131,93 +134,7 @@ PROXY_KEY=your-custom-key              # 客户端认证密钥
 REQUEST_TIMEOUT=60000                  # 请求超时（毫秒）
 LOG_LEVEL=info                         # 日志级别：debug, info, warn, error
 STRICT_MODE=true                       # 剥离所有用户系统消息（默认：true）
-WARP_PROXY=socks5h://host.docker.internal:40001  # WARP SOCKS5 代理（可选）
 ```
-
-## WARP 代理设置（可选）
-
-通过 Cloudflare WARP 路由上游请求实现 IP 混淆：
-
-### 网络拓扑
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  宿主机                                                          │
-│                                                                 │
-│  ┌─────────────┐    ┌──────────────────────────────────────┐   │
-│  │ warp-svc    │    │  Docker: claude-cloak                │   │
-│  │ SOCKS5      │◄───│                                      │   │
-│  │ :40000      │    │  用户 ──直连──▶ 代理 ──SOCKS5──┐     │   │
-│  └──────┬──────┘    │                                │     │   │
-│         │           │                                ▼     │   │
-│  ┌──────┴──────┐    │                         ┌──────────┐ │   │
-│  │ socat       │    │                         │ 上游请求  │ │   │
-│  │ :40001      │    │                         └──────────┘ │   │
-│  └─────────────┘    └──────────────────────────────────────┘   │
-│         │                                                       │
-└─────────┼───────────────────────────────────────────────────────┘
-          │ WARP 隧道
-          ▼
-   Cloudflare WARP
-   （隐藏出口 IP）
-          │
-          ▼
-   上游 Claude API
-```
-
-**要点：**
-- **用户 → Docker**：直接 TCP 连接（代理可见你的真实 IP）
-- **Docker → 上游**：通过 WARP 路由（上游看到 Cloudflare IP）
-- Cloudflare WARP 免费版即可满足需求
-
-### 宿主机配置
-
-```bash
-# 安装 Cloudflare WARP
-curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | \
-  gpg --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] \
-  https://pkg.cloudflareclient.com/ bookworm main" | \
-  tee /etc/apt/sources.list.d/cloudflare-client.list
-apt-get update && apt-get install cloudflare-warp
-
-# 配置 SOCKS5 代理模式
-warp-cli --accept-tos registration new
-warp-cli --accept-tos mode proxy
-warp-cli --accept-tos proxy port 40000
-warp-cli --accept-tos connect
-
-# 验证
-curl --socks5 127.0.0.1:40000 https://ipinfo.io/ip  # 应显示 Cloudflare IP
-```
-
-由于 WARP 仅绑定 127.0.0.1，需创建 systemd 服务转发到 Docker：
-
-```bash
-# /etc/systemd/system/warp-proxy-forward.service
-[Unit]
-Description=Forward WARP SOCKS5 proxy to Docker
-After=warp-svc.service
-
-[Service]
-ExecStart=/usr/bin/socat TCP-LISTEN:40001,bind=0.0.0.0,fork,reuseaddr TCP:127.0.0.1:40000
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-systemctl enable --now warp-proxy-forward
-```
-
-### 在 .env 中启用
-
-```env
-WARP_PROXY=socks5h://host.docker.internal:40001
-```
-
-> 使用 `socks5h://`（而非 `socks5://`）确保 DNS 查询也走 WARP。
 
 ## ⚠️ 重要限制
 
@@ -330,7 +247,7 @@ claude-cloak/
 │   │   ├── transform.ts    # 格式转换
 │   │   ├── stream.ts       # SSE 处理
 │   │   ├── user.ts         # 用户 ID 生成
-│   │   └── socks.ts        # WARP SOCKS5 代理
+│   │   └── obfuscate.ts    # 敏感词混淆
 │   ├── credentials/
 │   │   ├── manager.ts      # 凭证 CRUD 操作
 │   │   ├── storage.ts      # JSON 文件持久化
@@ -342,7 +259,8 @@ claude-cloak/
 │   ├── styles.css
 │   └── app.js
 ├── data/                   # 持久化存储（Docker 卷）
-├── Dockerfile
+├── Dockerfile              # Bun 运行时（默认）
+├── Dockerfile.node         # Node.js 回退
 ├── docker-compose.yml
 └── .env.example
 ```
@@ -351,19 +269,44 @@ claude-cloak/
 
 ```bash
 # 安装依赖
-npm install
+bun install
 
-# 开发模式
-npm run dev
+# 开发模式（热重载）
+bun --watch src/server.ts
 
 # 构建
-npm run build
+bun run build
 
 # 生产运行
-npm start
+bun start
+
+# 备选：使用 Node.js
+npm install
+npm run build
+npm run start:node
 ```
 
-## Docker 命令
+## Docker 部署
+
+### 默认（Bun 运行时 - 推荐）
+
+```bash
+docker compose up -d --build
+```
+
+### Node.js 回退
+
+如果遇到 Bun 流式传输问题，可使用 Node.js 镜像：
+
+```bash
+docker build -f Dockerfile.node -t claude-cloak:node .
+docker run -d --name claude-cloak -p 4000:4000 \
+  -e PROXY_KEY=your-secret \
+  -v ./data:/app/data \
+  claude-cloak:node
+```
+
+### Docker 命令
 
 ```bash
 docker compose up -d      # 启动
@@ -375,7 +318,7 @@ docker compose up -d --build  # 重建并启动
 
 ## 技术栈
 
-- **运行时**：Node.js 20+
+- **运行时**：Bun（支持 Node.js 回退）
 - **框架**：Fastify 5
 - **语言**：TypeScript
 - **容器**：Docker + Alpine
