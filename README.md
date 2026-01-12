@@ -6,6 +6,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Stealth_Proxy-0d9488?style=for-the-badge" alt="Stealth Proxy"/>
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/>
+  <img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"/>
   <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"/>
 </p>
 
@@ -22,7 +23,6 @@
 ## Features
 
 - **Request Cloaking**: Transforms all incoming requests to appear as Claude Code CLI
-- **IP Obfuscation**: Route upstream requests through Cloudflare WARP SOCKS5 proxy
 - **Anthropic Native Format**: Full support for Anthropic API including tool calling and multimodal content
 - **Dual Authentication**: Accepts `Authorization: Bearer` and `x-api-key` headers
 - **System Prompt Injection**: Automatically injects Claude Code identity
@@ -91,7 +91,6 @@ For Zeabur, ClawCloud, Railway, and similar platforms:
 - `STRICT_MODE` - Strip user system messages (default: `true`)
 - `NORMALIZE_PARAMS` - Normalize API parameters (default: `true`)
 - `SENSITIVE_WORDS_MAX_ENTRIES` - Max sensitive word entries (default: `20000`)
-- `WARP_PROXY` - SOCKS5 proxy for IP obfuscation
 
 ## Supported Clients
 
@@ -135,93 +134,7 @@ PROXY_KEY=your-custom-key              # Key for client authentication
 REQUEST_TIMEOUT=60000                  # Request timeout in ms
 LOG_LEVEL=info                         # Log level: debug, info, warn, error
 STRICT_MODE=true                       # Strip all user system messages (default: true)
-WARP_PROXY=socks5h://host.docker.internal:40001  # WARP SOCKS5 proxy (optional)
 ```
-
-## WARP Proxy Setup (Optional)
-
-Enable IP obfuscation by routing upstream requests through Cloudflare WARP:
-
-### Network Topology
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Host Machine                                                   │
-│                                                                 │
-│  ┌─────────────┐    ┌──────────────────────────────────────┐   │
-│  │ warp-svc    │    │  Docker: claude-cloak                │   │
-│  │ SOCKS5      │◄───│                                      │   │
-│  │ :40000      │    │  User ──direct──▶ Proxy ──SOCKS5──┐  │   │
-│  └──────┬──────┘    │                                   │  │   │
-│         │           │                                   ▼  │   │
-│  ┌──────┴──────┐    │                            ┌─────────┴┐  │
-│  │ socat       │    │                            │ Upstream │  │
-│  │ :40001      │    │                            │ Request  │  │
-│  └─────────────┘    └────────────────────────────┴──────────┘  │
-│         │                                                       │
-└─────────┼───────────────────────────────────────────────────────┘
-          │ WARP Tunnel
-          ▼
-   Cloudflare WARP
-   (Masked Exit IP)
-          │
-          ▼
-   Upstream Claude API
-```
-
-**Key Points:**
-- **User → Docker**: Direct TCP connection (your real IP visible to proxy)
-- **Docker → Upstream**: Routed through WARP (upstream sees Cloudflare IP)
-- Cloudflare WARP free tier is sufficient
-
-### Host Setup
-
-```bash
-# Install Cloudflare WARP
-curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | \
-  gpg --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] \
-  https://pkg.cloudflareclient.com/ bookworm main" | \
-  tee /etc/apt/sources.list.d/cloudflare-client.list
-apt-get update && apt-get install cloudflare-warp
-
-# Configure SOCKS5 proxy mode
-warp-cli --accept-tos registration new
-warp-cli --accept-tos mode proxy
-warp-cli --accept-tos proxy port 40000
-warp-cli --accept-tos connect
-
-# Verify
-curl --socks5 127.0.0.1:40000 https://ipinfo.io/ip  # Should show Cloudflare IP
-```
-
-Since WARP only binds to 127.0.0.1, create a systemd service to forward to Docker:
-
-```bash
-# /etc/systemd/system/warp-proxy-forward.service
-[Unit]
-Description=Forward WARP SOCKS5 proxy to Docker
-After=warp-svc.service
-
-[Service]
-ExecStart=/usr/bin/socat TCP-LISTEN:40001,bind=0.0.0.0,fork,reuseaddr TCP:127.0.0.1:40000
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-systemctl enable --now warp-proxy-forward
-```
-
-### Enable in .env
-
-```env
-WARP_PROXY=socks5h://host.docker.internal:40001
-```
-
-> Use `socks5h://` (not `socks5://`) to ensure DNS queries also go through WARP.
 
 ## ⚠️ Important Limitations
 
@@ -334,7 +247,6 @@ claude-cloak/
 │   │   ├── transform.ts    # Format conversion
 │   │   ├── stream.ts       # SSE handling
 │   │   ├── user.ts         # User ID generation
-│   │   ├── socks.ts        # WARP SOCKS5 proxy
 │   │   └── obfuscate.ts    # Sensitive word obfuscation
 │   ├── credentials/
 │   │   ├── manager.ts      # Credential CRUD operations
@@ -352,7 +264,8 @@ claude-cloak/
 │   ├── styles.css
 │   └── app.js
 ├── data/                   # Persistent storage (Docker volume)
-├── Dockerfile
+├── Dockerfile              # Bun runtime (default)
+├── Dockerfile.node         # Node.js fallback
 ├── docker-compose.yml
 └── .env.example
 ```
@@ -361,19 +274,44 @@ claude-cloak/
 
 ```bash
 # Install dependencies
-npm install
+bun install
 
-# Development mode
-npm run dev
+# Development mode (with hot reload)
+bun --watch src/server.ts
 
 # Build
-npm run build
+bun run build
 
 # Production
-npm start
+bun start
+
+# Alternative: Use Node.js
+npm install
+npm run build
+npm run start:node
 ```
 
-## Docker Commands
+## Docker Deployment
+
+### Default (Bun Runtime - Recommended)
+
+```bash
+docker compose up -d --build
+```
+
+### Node.js Fallback
+
+If you encounter streaming issues with Bun, use the Node.js image:
+
+```bash
+docker build -f Dockerfile.node -t claude-cloak:node .
+docker run -d --name claude-cloak -p 4000:4000 \
+  -e PROXY_KEY=your-secret \
+  -v ./data:/app/data \
+  claude-cloak:node
+```
+
+### Docker Commands
 
 ```bash
 docker compose up -d      # Start
@@ -385,7 +323,7 @@ docker compose up -d --build  # Rebuild and start
 
 ## Tech Stack
 
-- **Runtime**: Node.js 20+
+- **Runtime**: Bun (with Node.js fallback)
 - **Framework**: Fastify 5
 - **Language**: TypeScript
 - **Container**: Docker + Alpine
