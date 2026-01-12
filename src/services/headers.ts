@@ -1,7 +1,10 @@
+const CLI_VERSION = process.env.CLI_VERSION || '2.1.5'
+const SDK_VERSION = process.env.SDK_VERSION || '0.71.2'
+
 export function buildStealthHeaders(apiKey: string, stream = false): Record<string, string> {
   const headers: Record<string, string> = {
     'Authorization': `Bearer ${apiKey}`,
-    'User-Agent': 'claude-cli/2.0.55 (external, cli)',
+    'User-Agent': `claude-cli/${CLI_VERSION} (external, cli)`,
     'x-app': 'cli',
     'anthropic-version': '2023-06-01',
     'anthropic-beta': 'claude-code-20250219,interleaved-thinking-2025-05-14,context-management-2025-06-27',
@@ -9,7 +12,7 @@ export function buildStealthHeaders(apiKey: string, stream = false): Record<stri
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'X-Stainless-Lang': 'js',
-    'X-Stainless-Package-Version': '0.70.0',
+    'X-Stainless-Package-Version': SDK_VERSION,
     'X-Stainless-OS': 'Linux',
     'X-Stainless-Arch': 'x64',
     'X-Stainless-Runtime': 'node',

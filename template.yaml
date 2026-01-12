@@ -95,6 +95,10 @@ spec:
             default: "true"
           NORMALIZE_PARAMS:
             default: "true"
+          CLI_VERSION:
+            default: "2.1.5"
+          SDK_VERSION:
+            default: "0.71.2"
       domainKey: PUBLIC_DOMAIN
       instructions:
         - type: DOMAIN

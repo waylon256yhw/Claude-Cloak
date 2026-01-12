@@ -31,3 +31,8 @@ data/
 # Working documents
 PLAN.md
 PROGRESS.md
+CLAUDE.md
+ZEABUR_UPDATE_GUIDE.md
+
+# Serena
+.serena/
