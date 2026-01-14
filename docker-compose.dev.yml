@@ -1,7 +1,9 @@
 services:
   proxy:
-    image: ghcr.io/waylon256yhw/claude-cloak:latest
-    pull_policy: always
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
     container_name: claude-cloak
     env_file: .env
     ports:
