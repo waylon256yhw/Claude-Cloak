@@ -347,8 +347,13 @@ async function checkStatus() {
     try {
         const res = await fetch('/healthz');
         if (res.ok) {
+            const data = await res.json();
             els.status.className = 'status-indicator online';
             els.status.querySelector('.status-text').textContent = 'System Online';
+            const versionEl = document.getElementById('appVersion');
+            if (versionEl && data.version) {
+                versionEl.textContent = data.version;
+            }
         } else {
             throw new Error();
         }

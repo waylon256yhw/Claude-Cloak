@@ -1,4 +1,5 @@
 FROM oven/bun:1 AS builder
+ARG APP_VERSION=dev
 WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
@@ -7,8 +8,11 @@ COPY src ./src
 RUN bun run build
 
 FROM oven/bun:1-alpine
+ARG APP_VERSION=dev
 WORKDIR /app
 ENV NODE_ENV=production
+ENV APP_VERSION=$APP_VERSION
+LABEL org.opencontainers.image.version=$APP_VERSION
 RUN apk add --no-cache wget && chown -R bun:bun /app
 COPY --chown=bun:bun package.json bun.lock ./
 RUN bun install --frozen-lockfile --production

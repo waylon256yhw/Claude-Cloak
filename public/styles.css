@@ -626,6 +626,31 @@ input:focus {
 .status-indicator.online .status-text { color: var(--color-success); }
 .status-indicator.error .status-dot { background: var(--color-danger); }
 
+/* --- VERSION BADGE --- */
+.version-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+    background: var(--bg-code);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+.version-badge:hover {
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+    background: var(--accent-surface);
+}
+.version-badge:active { transform: scale(0.96); }
+@media (max-width: 480px) { .version-badge { display: none; } }
+
 /* --- EMPTY STATE --- */
 .empty-state {
     grid-column: 1 / -1;

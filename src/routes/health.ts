@@ -9,6 +9,7 @@ export async function healthRoutes(fastify: FastifyInstance) {
   fastify.get('/healthz', async () => ({
     status: 'ok',
     service: 'claude-cloak',
+    version: process.env.APP_VERSION || 'dev',
     timestamp: new Date().toISOString(),
   }))
 
