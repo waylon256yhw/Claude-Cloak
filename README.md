@@ -31,9 +31,9 @@
 - **Multi-Credential Management**: Store multiple upstream API credentials, switch at runtime
 - **Strict Mode**: Strip all user system messages, keep only Claude Code prompt
 - **Sensitive Word Obfuscation**: Automatically obfuscate configurable sensitive words in requests
-- **Parameter Normalization**: Strip unsupported parameters (top_p/top_k) to prevent upstream errors
-- **Admin Panel**: Web UI for credential and settings management (authentication required)
-- **Docker Ready**: One-command deployment with Docker Compose
+- **Parameter Normalization**: Strip unsupported parameters (top_p) to prevent upstream errors
+- **Admin Panel**: Web UI with version display, credential and settings management
+- **Docker Ready**: Production and development Docker Compose configurations
 
 ## Quick Start
 
@@ -183,7 +183,7 @@ curl -X POST https://your-domain/v1/messages \
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/healthz` | Health check |
+| GET | `/healthz` | Health check (includes version) |
 | GET | `/health` | Detailed health info |
 | GET | `/v1/models` | List available models |
 | POST | `/v1/messages` | Anthropic native format (with tool calling support) |
@@ -266,7 +266,8 @@ claude-cloak/
 ├── data/                   # Persistent storage (Docker volume)
 ├── Dockerfile              # Bun runtime (default)
 ├── Dockerfile.node         # Node.js fallback
-├── docker-compose.yml
+├── docker-compose.yml      # Production (GHCR image)
+├── docker-compose.dev.yml  # Development (local build)
 └── .env.example
 ```
 
@@ -293,10 +294,26 @@ npm run start:node
 
 ## Docker Deployment
 
-### Default (Bun Runtime - Recommended)
+### Production (Recommended)
+
+Uses pre-built images from GitHub Container Registry with auto-pull:
 
 ```bash
-docker compose up -d --build
+docker compose up -d
+```
+
+The `pull_policy: always` ensures you get the latest image on each start.
+
+### Development (Local Build)
+
+For local development with custom version:
+
+```bash
+# Build with auto-detected version
+APP_VERSION=$(git describe --tags) docker compose -f docker-compose.dev.yml up -d --build
+
+# Or specify version manually
+APP_VERSION=v1.5.0 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
 ### Node.js Fallback
@@ -314,11 +331,11 @@ docker run -d --name claude-cloak -p 4000:4000 \
 ### Docker Commands
 
 ```bash
-docker compose up -d      # Start
-docker compose down       # Stop
-docker compose logs -f    # View logs
-docker compose restart    # Restart
-docker compose up -d --build  # Rebuild and start
+docker compose up -d          # Start (auto-pulls latest)
+docker compose down           # Stop
+docker compose logs -f        # View logs
+docker compose restart        # Restart
+docker compose pull           # Manual pull latest
 ```
 
 ## Tech Stack
