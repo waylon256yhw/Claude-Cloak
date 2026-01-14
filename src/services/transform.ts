@@ -25,10 +25,6 @@ function normalizeAnthropicParams(request: ClaudeRequest, logger?: LoggerLike): 
     delete normalized.top_p
     strippedKeys.push('top_p')
   }
-  if ('top_k' in normalized) {
-    delete normalized.top_k
-    strippedKeys.push('top_k')
-  }
 
   if (strippedKeys.length > 0) {
     logger?.debug?.({ strippedKeys, model: normalized.model }, 'Normalized API parameters')
