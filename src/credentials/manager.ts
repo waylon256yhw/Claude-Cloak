@@ -24,6 +24,21 @@ class Mutex {
   }
 }
 
+
+function validateTargetUrl(raw: string): string {
+  const trimmed = raw.trim()
+  let url: URL
+  try {
+    url = new URL(trimmed)
+  } catch {
+    throw new Error('Invalid targetUrl: malformed URL')
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new Error('Invalid targetUrl: only http/https allowed')
+  }
+  return url.origin + url.pathname.replace(/\/+$/, '')
+}
+
 export class CredentialManager {
   private store: CredentialStore = { credentials: [], activeId: null }
   private storage: CredentialStorage
@@ -62,7 +77,7 @@ export class CredentialManager {
       const cred: Credential = {
         id: randomUUID(),
         name: input.name,
-        targetUrl: input.targetUrl.replace(/\/+$/, ''),
+        targetUrl: validateTargetUrl(input.targetUrl),
         apiKey: input.apiKey,
         isActive: isFirst,
         createdAt: now,
@@ -88,7 +103,7 @@ export class CredentialManager {
       const updated: Credential = {
         ...existing,
         name: input.name ?? existing.name,
-        targetUrl: input.targetUrl ? input.targetUrl.replace(/\/+$/, '') : existing.targetUrl,
+        targetUrl: input.targetUrl ? validateTargetUrl(input.targetUrl) : existing.targetUrl,
         apiKey: (input.apiKey && input.apiKey.trim()) ? input.apiKey.trim() : existing.apiKey,
         updatedAt: new Date().toISOString(),
       }

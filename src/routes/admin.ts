@@ -18,8 +18,11 @@ function looksLikeMaskedKey(key: string): boolean {
 
 function handleCrudError(reply: FastifyReply, err: unknown): void {
   const msg = err instanceof Error ? err.message : String(err)
-  if (msg.includes('not found')) {
+  const lower = msg.toLowerCase()
+  if (lower.includes('not found')) {
     reply.code(404).send({ error: 'Not Found', message: msg })
+  } else if (lower.includes('invalid')) {
+    reply.code(400).send({ error: 'Bad Request', message: msg })
   } else {
     reply.code(500).send({ error: 'Internal Server Error', message: msg })
   }
@@ -54,7 +57,7 @@ async function registerCredentialRoutes(fastify: FastifyInstance): Promise<void>
       const created = await credentialManager.create({ name, targetUrl, apiKey })
       return maskCredential(created)
     } catch (err) {
-      reply.code(500).send({ error: 'Internal Server Error', message: (err as Error).message })
+      handleCrudError(reply, err)
     }
   })
 
