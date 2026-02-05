@@ -32,7 +32,7 @@
 - **Strict Mode**: Strip all user system messages, keep only Claude Code prompt
 - **Sensitive Word Obfuscation**: Automatically obfuscate configurable sensitive words in requests
 - **Parameter Normalization**: Strip unsupported parameters (top_p) to prevent upstream errors
-- **Admin Panel**: Web UI with version display, credential and settings management
+- **Admin Panel**: Web UI with version display, credential management, connection testing, and settings
 - **Docker Ready**: Production and development Docker Compose configurations
 
 ## Quick Start
@@ -193,8 +193,9 @@ curl -X POST https://your-domain/v1/messages \
 
 Access the web-based admin panel at `/admin/` to:
 - **Manage Credentials**: Add, edit, delete, and switch between multiple upstream API credentials
+- **Test Connection**: Verify upstream API connectivity with one click (shows latency)
 - **Toggle Strict Mode**: Enable/disable system message stripping at runtime
-- **Monitor Status**: View proxy health status
+- **Monitor Status**: View proxy health status and version
 
 > **Security**: Admin API endpoints require authentication using `PROXY_KEY`.
 
