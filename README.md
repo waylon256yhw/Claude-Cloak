@@ -100,7 +100,7 @@ Any client that supports **Anthropic API format** can use this proxy:
   <tr>
     <td align="center" width="200">
       <a href="https://github.com/SillyTavern/SillyTavern">
-        <img src="https://avatars.githubusercontent.com/u/91866994?s=200&v=4" width="64" height="64" alt="SillyTavern"/><br/>
+        <img src="https://avatars.githubusercontent.com/u/134869877?s=200&v=4" width="64" height="64" alt="SillyTavern"/><br/>
         <b>SillyTavern</b>
       </a><br/>
       <sub>Anthropic Format</sub>
@@ -114,7 +114,7 @@ Any client that supports **Anthropic API format** can use this proxy:
     </td>
     <td align="center" width="200">
       <a href="https://github.com/anthropics/claude-code">
-        <img src="https://avatars.githubusercontent.com/u/77675888?s=200&v=4" width="64" height="64" alt="Claude Code CLI"/><br/>
+        <img src="https://avatars.githubusercontent.com/u/76263028?s=200&v=4" width="64" height="64" alt="Claude Code CLI"/><br/>
         <b>Claude Code CLI</b>
       </a><br/>
       <sub>Official CLI</sub>
