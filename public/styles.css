@@ -428,6 +428,41 @@ h1, h2, h3 {
     background: var(--bg-danger);
 }
 
+/* Test Connection Button */
+.btn-test {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+.btn-test.testing {
+    color: var(--accent-primary);
+    cursor: wait;
+}
+
+.btn-test.success {
+    color: var(--color-success);
+    min-width: 80px;
+}
+
+.btn-test.error {
+    color: var(--color-danger);
+    min-width: 80px;
+}
+
+.btn-content {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
 /* --- SETTINGS --- */
 .settings-card {
     background: var(--bg-panel);

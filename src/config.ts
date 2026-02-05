@@ -15,6 +15,7 @@ export function loadConfig(): Config {
     apiKey: process.env.API_KEY || null,
     proxyKey: requireEnv('PROXY_KEY'),
     requestTimeout: parseInt(process.env.REQUEST_TIMEOUT || '60000', 10),
+    testRequestTimeout: parseInt(process.env.TEST_REQUEST_TIMEOUT || '15000', 10),
     logLevel: process.env.LOG_LEVEL || 'info',
   }
 }

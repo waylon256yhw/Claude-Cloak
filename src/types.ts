@@ -4,6 +4,7 @@ export interface Config {
   apiKey: string | null
   proxyKey: string
   requestTimeout: number
+  testRequestTimeout: number
   logLevel: string
 }
 

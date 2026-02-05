@@ -5,6 +5,7 @@ import type { CreateCredentialInput, UpdateCredentialInput } from '../credential
 import { maskCredential } from '../credentials/types.js'
 import { settingsManager, type Settings } from '../settings/manager.js'
 import { sensitiveWordsManager } from '../sensitive-words/manager.js'
+import { buildStealthHeaders } from '../services/headers.js'
 
 interface IdParams {
   id: string
@@ -28,7 +29,7 @@ function handleCrudError(reply: FastifyReply, err: unknown): void {
   }
 }
 
-async function registerCredentialRoutes(fastify: FastifyInstance): Promise<void> {
+async function registerCredentialRoutes(fastify: FastifyInstance, config: Config): Promise<void> {
   fastify.get('/credentials', async () => {
     const credentials = credentialManager.getAll()
     return credentials.map(maskCredential)
@@ -89,6 +90,58 @@ async function registerCredentialRoutes(fastify: FastifyInstance): Promise<void>
       return await credentialManager.activate(request.params.id)
     } catch (err) {
       handleCrudError(reply, err)
+    }
+  })
+
+  fastify.post<{ Params: IdParams }>('/credentials/:id/test', async (request, reply) => {
+    const cred = credentialManager.getById(request.params.id)
+    if (!cred) {
+      reply.code(404).send({ error: 'Not Found', message: 'Credential not found' })
+      return
+    }
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), config.testRequestTimeout)
+    const startTime = Date.now()
+
+    try {
+      const res = await fetch(`${cred.targetUrl}/v1/messages`, {
+        method: 'POST',
+        headers: buildStealthHeaders(cred.apiKey, false),
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 10,
+          stream: false,
+          messages: [{ role: 'user', content: 'Hi' }]
+        }),
+        signal: controller.signal
+      })
+
+      clearTimeout(timeout)
+      const latencyMs = Date.now() - startTime
+
+      if (res.ok) {
+        return { success: true, latencyMs, statusCode: res.status }
+      }
+
+      const data = await res.json().catch(() => ({})) as { error?: { type?: string; message?: string } }
+      return {
+        success: false,
+        latencyMs,
+        statusCode: res.status,
+        error: data.error || { message: `HTTP ${res.status}` }
+      }
+    } catch (err) {
+      clearTimeout(timeout)
+      const latencyMs = Date.now() - startTime
+      const isTimeout = (err as Error).name === 'AbortError'
+
+      return {
+        success: false,
+        latencyMs,
+        statusCode: isTimeout ? 504 : 502,
+        error: isTimeout ? 'Upstream request timed out' : (err as Error).message
+      }
     }
   })
 
@@ -198,8 +251,8 @@ async function registerSensitiveWordsRoutes(fastify: FastifyInstance): Promise<v
   })
 }
 
-export async function adminRoutes(fastify: FastifyInstance, _config: Config) {
-  await registerCredentialRoutes(fastify)
+export async function adminRoutes(fastify: FastifyInstance, config: Config) {
+  await registerCredentialRoutes(fastify, config)
   await registerSettingsRoutes(fastify)
   await registerSensitiveWordsRoutes(fastify)
 }
