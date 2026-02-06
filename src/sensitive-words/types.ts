@@ -13,6 +13,7 @@ export interface SensitiveWordsStore {
 }
 
 export interface CompiledMatcher {
-  regexList?: RegExp[]
+  ac?: import('modern-ahocorasick').default
+  keyGraphemeLens?: Map<string, number>
   zw: string
 }

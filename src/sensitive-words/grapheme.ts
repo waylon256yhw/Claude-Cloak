@@ -10,22 +10,31 @@ function getSegmenter(): Intl.Segmenter | null {
   return segmenter
 }
 
-export function graphemes(s: string): string[] {
+export interface GraphemeSegment {
+  segment: string
+  index: number
+}
+
+export function segmentGraphemes(s: string): GraphemeSegment[] {
   const seg = getSegmenter()
   if (seg) {
-    return Array.from(seg.segment(s), (x) => x.segment)
+    return Array.from(seg.segment(s), (x) => ({ segment: x.segment, index: x.index }))
   }
-  return Array.from(s)
+  const chars = Array.from(s)
+  let idx = 0
+  return chars.map((segment) => {
+    const current = { segment, index: idx }
+    idx += segment.length
+    return current
+  })
+}
+
+export function graphemes(s: string): string[] {
+  return segmentGraphemes(s).map((x) => x.segment)
 }
 
 export function graphemeLength(s: string): number {
-  const seg = getSegmenter()
-  if (seg) {
-    let count = 0
-    for (const _ of seg.segment(s)) count++
-    return count
-  }
-  return Array.from(s).length
+  return segmentGraphemes(s).length
 }
 
 export function containsZW(s: string): boolean {

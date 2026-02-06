@@ -30,8 +30,8 @@
 - **SSE 流式传输**：完整支持流式响应，带背压处理
 - **多凭证管理**：存储多个上游 API 凭证，运行时切换
 - **严格模式**：剥离所有用户系统消息，仅保留 Claude Code 提示
-- **敏感词混淆**：自动混淆可配置的敏感词
-- **参数规范化**：剥离不支持的参数（top_p/top_k）防止上游错误
+- **敏感词混淆**：Aho-Corasick 单次扫描，自动混淆可配置的敏感词
+- **参数规范化**：剥离不支持的参数（top_p）防止上游错误
 - **管理面板**：Web UI 管理凭证、测试连接和设置（需要认证）
 - **Docker 就绪**：一键 Docker Compose 部署
 
@@ -91,6 +91,11 @@ docker run -d \
 - `STRICT_MODE` - 剥离用户系统消息（默认：`true`）
 - `NORMALIZE_PARAMS` - 规范化 API 参数（默认：`true`）
 - `SENSITIVE_WORDS_MAX_ENTRIES` - 敏感词最大数量（默认：`20000`）
+- `TEST_REQUEST_TIMEOUT` - 凭证测试超时毫秒数（默认：`15000`）
+- `CREDENTIAL_STORE_PATH` - 凭证存储路径（默认：`./data/credentials.json`）
+- `SENSITIVE_WORDS_PATH` - 敏感词存储路径（默认：`./data/sensitive-words.json`）
+- `CLI_VERSION` - 伪装 CLI 版本头（默认：`2.1.31`）
+- `SDK_VERSION` - 伪装 SDK 版本头（默认：`0.72.1`）
 
 ## 支持的客户端
 
@@ -289,10 +294,20 @@ npm run start:node
 
 ## Docker 部署
 
-### 默认（Bun 运行时 - 推荐）
+### 生产（推荐）
+
+使用 GitHub Container Registry 预构建镜像，自动拉取：
 
 ```bash
-docker compose up -d --build
+docker compose up -d
+```
+
+`pull_policy: always` 确保每次启动获取最新镜像。
+
+### 开发（本地构建）
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
 ### Node.js 回退
@@ -310,11 +325,11 @@ docker run -d --name claude-cloak -p 4000:4000 \
 ### Docker 命令
 
 ```bash
-docker compose up -d      # 启动
+docker compose up -d      # 启动（自动拉取最新）
 docker compose down       # 停止
 docker compose logs -f    # 查看日志
 docker compose restart    # 重启
-docker compose up -d --build  # 重建并启动
+docker compose pull       # 手动拉取最新
 ```
 
 ## 技术栈

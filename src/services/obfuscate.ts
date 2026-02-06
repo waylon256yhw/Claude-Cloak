@@ -1,6 +1,6 @@
 import type { CompiledMatcher } from '../sensitive-words/types.js'
 import type { ClaudeRequest, ClaudeMessage, ClaudeSystemBlock } from '../types.js'
-import { graphemes } from '../sensitive-words/grapheme.js'
+import { graphemes, segmentGraphemes } from '../sensitive-words/grapheme.js'
 
 function obfuscateMatch(m: string, zw: string): string {
   if (m.includes(zw)) return m
@@ -10,12 +10,45 @@ function obfuscateMatch(m: string, zw: string): string {
 }
 
 export function obfuscateText(text: string, matcher: CompiledMatcher): string {
-  if (!matcher.regexList?.length) return text
+  if (!matcher.ac) return text
 
-  let result = text
-  for (const regex of matcher.regexList) {
-    result = result.replace(regex, (m) => obfuscateMatch(m, matcher.zw))
+  const normalized = text.normalize('NFKC')
+  const lowered = normalized.toLowerCase()
+  const matches = matcher.ac.search(lowered)
+  if (matches.length === 0) return normalized
+
+  const segments = segmentGraphemes(normalized)
+
+  type Rep = { charStart: number; charEnd: number }
+  const reps: Rep[] = []
+
+  for (const [endIdx, keywords] of matches) {
+    const longest = keywords.reduce((a, b) =>
+      (matcher.keyGraphemeLens!.get(a) ?? 0) >= (matcher.keyGraphemeLens!.get(b) ?? 0) ? a : b
+    )
+    const keyLen = matcher.keyGraphemeLens!.get(longest)!
+    const startIdx = endIdx - keyLen + 1
+    if (startIdx < 0) continue
+
+    const charStart = segments[startIdx].index
+    const charEnd = endIdx + 1 < segments.length
+      ? segments[endIdx + 1].index
+      : normalized.length
+
+    reps.push({ charStart, charEnd })
   }
+
+  reps.sort((a, b) => a.charStart - b.charStart || (b.charEnd - b.charStart) - (a.charEnd - a.charStart))
+
+  let result = ''
+  let pos = 0
+  for (const rep of reps) {
+    if (rep.charStart < pos) continue
+    result += normalized.slice(pos, rep.charStart)
+    result += obfuscateMatch(normalized.slice(rep.charStart, rep.charEnd), matcher.zw)
+    pos = rep.charEnd
+  }
+  result += normalized.slice(pos)
   return result
 }
 
@@ -81,7 +114,7 @@ export function obfuscateAnthropicRequest(
   request: ClaudeRequest,
   matcher: CompiledMatcher
 ): ClaudeRequest {
-  if (!matcher.regexList?.length) return request
+  if (!matcher.ac) return request
 
   const result = { ...request }
 

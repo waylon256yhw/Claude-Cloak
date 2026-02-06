@@ -69,34 +69,19 @@ async function proxyToClaude(
     const contentType = response.headers.get('content-type') || ''
 
     if (contentType.includes('text/event-stream')) {
-      // Use idle timeout: reset on each chunk, only abort if no data received
       const idleTimeout = config.requestTimeout * 2
-      try {
-        return await pipeStream(response as Parameters<typeof pipeStream>[0], reply, controller.signal, idleTimeout)
-      } finally {
-        // Clean up listeners
-        request.raw.off('close', cleanup)
-        request.raw.off('aborted', cleanup)
-        reply.raw.off('close', cleanup)
-      }
+      return await pipeStream(response as Parameters<typeof pipeStream>[0], reply, controller.signal, idleTimeout)
     }
 
-    const data = await response.text()
-
-    let result: unknown
-    try {
-      result = JSON.parse(data)
-    } catch {
-      result = { raw: data }
-    }
+    const data = Buffer.from(await response.arrayBuffer())
 
     reply.code(response.status).headers({
-      'Content-Type': 'application/json',
+      'Content-Type': contentType || 'application/json',
       'X-Proxy-Status': response.status === 200 ? 'bypassed' : 'blocked',
       'X-Original-Status': String(response.status),
     })
 
-    return result
+    return reply.send(data)
   } catch (err) {
     clearTimeout(initialTimeout)
     const error = err as Error & { code?: string; cause?: { code?: string } }

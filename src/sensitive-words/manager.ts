@@ -1,16 +1,11 @@
 import { randomUUID } from 'node:crypto'
+import AhoCorasick from 'modern-ahocorasick'
 import type { SensitiveWordEntry, SensitiveWordsStore, CompiledMatcher } from './types.js'
 import { SensitiveWordsStorage } from './storage.js'
-import { graphemes, graphemeLength, containsZW, ZW } from './grapheme.js'
+import { graphemeLength, containsZW, ZW } from './grapheme.js'
 
 const MAX_ENTRIES = Math.max(100, parseInt(process.env.SENSITIVE_WORDS_MAX_ENTRIES || '20000', 10) || 20000)
 const MAX_WORD_LENGTH = 100
-
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-const REGEX_CHUNK_SIZE = 500
 
 class SensitiveWordsManager {
   private storage = new SensitiveWordsStorage()
@@ -50,35 +45,30 @@ class SensitiveWordsManager {
       return
     }
 
-    // Build index and collect words for regex
-    const wordsWithLength: { word: string; len: number }[] = []
+    const seen = new Set<string>()
+    const keywords: string[] = []
+    const keyGraphemeLens = new Map<string, number>()
+
     for (const entry of this.store.entries) {
       const normalized = entry.word.normalize('NFKC')
       const len = graphemeLength(normalized)
       this.wordIndex.set(this.normalizeForIndex(entry.word), entry.id)
       if (len >= 2) {
-        wordsWithLength.push({ word: normalized, len })
+        const lower = normalized.toLowerCase()
+        if (!seen.has(lower)) {
+          seen.add(lower)
+          keywords.push(lower)
+          keyGraphemeLens.set(lower, len)
+        }
       }
     }
 
-    // Dedupe by lowercase and sort by length (longest first for greedy matching)
-    const uniq = [...new Map(wordsWithLength.map((w) => [w.word.toLowerCase(), w])).values()]
-    uniq.sort((a, b) => b.len - a.len)
-
-    if (uniq.length === 0) {
+    if (keywords.length === 0) {
       this.matcher = { zw: ZW }
       return
     }
 
-    // Chunk into groups to avoid regex complexity issues
-    const regexList: RegExp[] = []
-    for (let i = 0; i < uniq.length; i += REGEX_CHUNK_SIZE) {
-      const chunk = uniq.slice(i, i + REGEX_CHUNK_SIZE)
-      const pattern = chunk.map((w) => escapeRegExp(w.word)).join('|')
-      regexList.push(new RegExp(pattern, 'giu'))
-    }
-
-    this.matcher = { regexList, zw: ZW }
+    this.matcher = { ac: new AhoCorasick(keywords), keyGraphemeLens, zw: ZW }
   }
 
   async isEnabled(): Promise<boolean> {

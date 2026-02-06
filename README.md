@@ -30,7 +30,7 @@
 - **SSE Streaming**: Full support for streaming responses with backpressure handling
 - **Multi-Credential Management**: Store multiple upstream API credentials, switch at runtime
 - **Strict Mode**: Strip all user system messages, keep only Claude Code prompt
-- **Sensitive Word Obfuscation**: Automatically obfuscate configurable sensitive words in requests
+- **Sensitive Word Obfuscation**: Aho-Corasick single-pass scanning for configurable sensitive word obfuscation
 - **Parameter Normalization**: Strip unsupported parameters (top_p) to prevent upstream errors
 - **Admin Panel**: Web UI with version display, credential management, connection testing, and settings
 - **Docker Ready**: Production and development Docker Compose configurations
@@ -91,6 +91,11 @@ For Zeabur, ClawCloud, Railway, and similar platforms:
 - `STRICT_MODE` - Strip user system messages (default: `true`)
 - `NORMALIZE_PARAMS` - Normalize API parameters (default: `true`)
 - `SENSITIVE_WORDS_MAX_ENTRIES` - Max sensitive word entries (default: `20000`)
+- `TEST_REQUEST_TIMEOUT` - Credential test timeout in ms (default: `15000`)
+- `CREDENTIAL_STORE_PATH` - Credential storage path (default: `./data/credentials.json`)
+- `SENSITIVE_WORDS_PATH` - Sensitive words storage path (default: `./data/sensitive-words.json`)
+- `CLI_VERSION` - Spoofed CLI version header (default: `2.1.31`)
+- `SDK_VERSION` - Spoofed SDK version header (default: `0.72.1`)
 
 ## Supported Clients
 

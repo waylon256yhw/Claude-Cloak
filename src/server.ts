@@ -1,7 +1,5 @@
 import { join } from 'node:path'
 import Fastify from 'fastify'
-import helmet from '@fastify/helmet'
-import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { loadConfig } from './config.js'
 import { createAuthHook } from './services/auth.js'
@@ -12,8 +10,6 @@ import { adminRoutes } from './routes/admin.js'
 import { credentialManager } from './credentials/manager.js'
 
 const MAX_BODY_SIZE = 20 * 1024 * 1024 // 20MB - accommodate large PDFs/images (base64 encoded)
-const RATE_LIMIT_MAX = 100
-const RATE_LIMIT_WINDOW = '1 minute'
 
 const config = loadConfig()
 
@@ -26,24 +22,10 @@ const fastify = Fastify({
   bodyLimit: MAX_BODY_SIZE,
 })
 
-await fastify.register(helmet, {
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts in admin panel
-      styleSrc: ["'self'", "'unsafe-inline'"],  // Allow inline styles in admin panel
-      imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
-    },
-  },
-})
-await fastify.register(rateLimit, {
-  max: RATE_LIMIT_MAX,
-  timeWindow: RATE_LIMIT_WINDOW,
+fastify.addHook('onSend', async (_request, reply) => {
+  reply.header('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'")
+  reply.header('X-Content-Type-Options', 'nosniff')
+  reply.header('X-Frame-Options', 'DENY')
 })
 
 await fastify.register(healthRoutes)
