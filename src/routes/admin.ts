@@ -5,6 +5,7 @@ import type { CreateCredentialInput, UpdateCredentialInput } from '../credential
 import { maskCredential } from '../credentials/types.js'
 import { settingsManager, type Settings } from '../settings/manager.js'
 import { sensitiveWordsManager } from '../sensitive-words/manager.js'
+import { modelManager } from '../models/manager.js'
 import { buildStealthHeaders } from '../services/headers.js'
 
 interface IdParams {
@@ -109,7 +110,7 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
         method: 'POST',
         headers: buildStealthHeaders(cred.apiKey, false),
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: modelManager.getTestModelId(),
           max_tokens: 10,
           stream: false,
           messages: [{ role: 'user', content: 'Hi' }]
@@ -251,8 +252,64 @@ async function registerSensitiveWordsRoutes(fastify: FastifyInstance): Promise<v
   })
 }
 
+async function registerModelRoutes(fastify: FastifyInstance): Promise<void> {
+  fastify.get('/models', async () => {
+    return modelManager.getStore()
+  })
+
+  fastify.post<{ Body: { id: string; created?: number } }>('/models', async (request, reply) => {
+    const { id, created } = request.body || {}
+    if (!id || typeof id !== 'string' || !id.trim()) {
+      reply.code(400).send({ error: 'Bad Request', message: 'Missing required field: id' })
+      return
+    }
+    if (created !== undefined && (typeof created !== 'number' || !Number.isFinite(created))) {
+      reply.code(400).send({ error: 'Bad Request', message: 'created must be a finite number' })
+      return
+    }
+    try {
+      return await modelManager.add(id.trim(), created)
+    } catch (err) {
+      handleCrudError(reply, err)
+    }
+  })
+
+  fastify.delete<{ Params: IdParams }>('/models/:id', async (request, reply) => {
+    try {
+      await modelManager.remove(request.params.id)
+      return { success: true }
+    } catch (err) {
+      handleCrudError(reply, err)
+    }
+  })
+
+  fastify.put<{ Body: { id: string } }>('/models/test-model', async (request, reply) => {
+    const { id } = request.body || {}
+    if (!id || typeof id !== 'string' || !id.trim()) {
+      reply.code(400).send({ error: 'Bad Request', message: 'Missing required field: id' })
+      return
+    }
+    try {
+      await modelManager.setTestModelId(id.trim())
+      return { testModelId: id.trim() }
+    } catch (err) {
+      handleCrudError(reply, err)
+    }
+  })
+
+  fastify.post('/models/reset', async (_request, reply) => {
+    try {
+      await modelManager.reset()
+      return modelManager.getStore()
+    } catch (err) {
+      handleCrudError(reply, err)
+    }
+  })
+}
+
 export async function adminRoutes(fastify: FastifyInstance, config: Config) {
   await registerCredentialRoutes(fastify, config)
   await registerSettingsRoutes(fastify)
   await registerSensitiveWordsRoutes(fastify)
+  await registerModelRoutes(fastify)
 }

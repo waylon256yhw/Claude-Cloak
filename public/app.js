@@ -4,6 +4,8 @@ const AUTH_STORAGE_KEY = 'claude_admin_proxy_key';
 const IDLE_LOGOUT_MS = 30 * 60 * 1000; // 30 minutes, set to 0 to disable
 
 let credentials = [];
+let fallbackModels = [];
+let modelTestModelId = '';
 let sensitiveWords = [];
 let wordsDisplayLimit = 50;
 let wordsSearchQuery = '';
@@ -224,6 +226,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             loadCredentials();
             loadSettings();
             loadSensitiveWords();
+            loadModels();
         } finally {
             if (submitBtn) submitBtn.disabled = false;
         }
@@ -840,4 +843,146 @@ document.getElementById('sensitiveWordsList')?.addEventListener('click', (e) => 
     } else if (action === 'delete') {
         deleteWord(id);
     }
+});
+
+// --- FALLBACK MODELS ---
+
+async function loadModels() {
+    try {
+        const data = await api('/models');
+        fallbackModels = data.entries || [];
+        modelTestModelId = data.testModelId || '';
+        renderModels();
+        renderTestModelSelect();
+    } catch (e) {
+        console.error('Failed to load models:', e);
+    }
+}
+
+function renderModels() {
+    const tbody = document.getElementById('modelsList');
+    if (!tbody) return;
+
+    const countLabel = document.getElementById('modelsCountLabel');
+    if (countLabel) {
+        const n = fallbackModels.length;
+        countLabel.textContent = n === 0 ? 'No models configured' :
+            n === 1 ? '1 model configured' : `${n} models configured`;
+    }
+
+    if (fallbackModels.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="2" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                    <p>No fallback models configured.</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = fallbackModels.map(m => `
+        <tr>
+            <td><span class="word-pattern">${esc(m.id)}</span></td>
+            <td>
+                <div class="actions-cell">
+                    <button class="btn-icon btn-icon-danger" data-model-action="delete" data-id="${esc(m.id)}" title="Delete">${icons.trash}</button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderTestModelSelect() {
+    const select = document.getElementById('testModelSelect');
+    if (!select) return;
+    select.innerHTML = fallbackModels.map(m =>
+        `<option value="${esc(m.id)}" ${m.id === modelTestModelId ? 'selected' : ''}>${esc(m.id)}</option>`
+    ).join('');
+    if (!fallbackModels.some(m => m.id === modelTestModelId) && modelTestModelId) {
+        select.insertAdjacentHTML('afterbegin',
+            `<option value="${esc(modelTestModelId)}" selected>${esc(modelTestModelId)} (custom)</option>`
+        );
+    }
+}
+
+async function addModel(id) {
+    try {
+        await api('/models', { method: 'POST', body: JSON.stringify({ id }) });
+        showToast('Model added', 'success');
+        loadModels();
+    } catch (e) { /* handled */ }
+}
+
+async function deleteModel(id) {
+    if (!await showConfirm({ title: 'Delete Model', message: `Remove "${id}" from fallback list?`, icon: 'trash', danger: true })) return;
+    try {
+        await api(`/models/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        showToast('Model deleted', 'success');
+        loadModels();
+    } catch (e) { /* handled */ }
+}
+
+async function resetModels() {
+    if (!await showConfirm({
+        title: 'Reset Models',
+        message: 'Restore the built-in default model list?',
+        icon: 'warning'
+    })) return;
+    try {
+        await api('/models/reset', { method: 'POST' });
+        showToast('Models reset to defaults', 'success');
+        loadModels();
+    } catch (e) { /* handled */ }
+}
+
+async function changeTestModel(id) {
+    try {
+        await api('/models/test-model', { method: 'PUT', body: JSON.stringify({ id }) });
+        modelTestModelId = id;
+        showToast('Test model updated', 'success');
+    } catch (e) {
+        renderTestModelSelect();
+    }
+}
+
+function openModelModal() {
+    document.getElementById('modelId').value = '';
+    document.getElementById('modelModal').classList.remove('hidden');
+    document.getElementById('modelId').focus();
+}
+
+function closeModelModal() {
+    document.getElementById('modelModal').classList.add('hidden');
+    document.getElementById('modelForm').reset();
+}
+
+// Model event listeners
+document.getElementById('btnAddModel')?.addEventListener('click', openModelModal);
+document.getElementById('btnModelModalClose')?.addEventListener('click', closeModelModal);
+document.getElementById('btnModelCancel')?.addEventListener('click', closeModelModal);
+document.getElementById('btnResetModels')?.addEventListener('click', resetModels);
+document.getElementById('testModelSelect')?.addEventListener('change', (e) => changeTestModel(e.target.value));
+
+document.getElementById('modelForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('modelId').value.trim();
+    if (!id) return;
+    await addModel(id);
+    closeModelModal();
+});
+
+document.getElementById('modelsListHeader')?.addEventListener('click', () => {
+    const card = document.getElementById('modelsCard');
+    const content = document.getElementById('modelsListContent');
+    if (card && content) {
+        card.classList.toggle('expanded');
+        content.classList.toggle('collapsed');
+    }
+});
+
+document.getElementById('modelsList')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-model-action]');
+    if (!btn) return;
+    if (btn.dataset.modelAction === 'delete') deleteModel(btn.dataset.id);
 });

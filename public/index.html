@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claude Cloak - Admin</title>
-    <link rel="stylesheet" href="styles.css?v=14">
+    <link rel="stylesheet" href="styles.css?v=15">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22 fill=%22%230d9488%22><path d=%22M50 8C27 8 10 27 10 52V90L50 73L90 90V52C90 27 73 8 50 8Z%22/></svg>">
 </head>
 <body>
@@ -90,6 +90,45 @@
                             <input type="checkbox" id="normalizeParamsToggle">
                             <span class="toggle-slider"></span>
                         </label>
+                    </div>
+                </div>
+
+                <div class="section-header" style="margin-top: 2.5rem;">
+                    <h2>Fallback Models</h2>
+                    <div class="header-actions">
+                        <button id="btnResetModels" class="btn btn-secondary btn-sm">Reset Defaults</button>
+                        <button id="btnAddModel" class="btn btn-primary btn-sm">+ Add Model</button>
+                    </div>
+                </div>
+                <div class="settings-card">
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <span class="setting-label">Test Model</span>
+                            <span class="setting-desc">Model used for credential connectivity tests</span>
+                        </div>
+                        <select id="testModelSelect" class="form-select"></select>
+                    </div>
+                </div>
+                <div class="card collapsible-card" style="padding: 0; overflow: hidden; margin-top: 1rem;" id="modelsCard">
+                    <div class="collapsible-header" id="modelsListHeader">
+                        <span class="collapsible-title">
+                            <span class="collapsible-icon">▶</span>
+                            <span id="modelsCountLabel">0 models configured</span>
+                        </span>
+                        <span class="collapsible-hint">Click to expand</span>
+                    </div>
+                    <div class="collapsible-content collapsed" id="modelsListContent">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Model ID</th>
+                                        <th style="width: 120px; text-align: right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modelsList"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -229,6 +268,26 @@
             </div>
         </div>
 
+        <!-- Add Model Modal -->
+        <div id="modelModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Add Model</h3>
+                    <button class="btn-close" id="btnModelModalClose">&times;</button>
+                </div>
+                <form id="modelForm">
+                    <div class="form-group">
+                        <label for="modelId">Model ID</label>
+                        <input type="text" id="modelId" required placeholder="e.g. claude-opus-4-6" autocomplete="off">
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" id="btnModelCancel">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- Admin Login Overlay -->
         <div id="authOverlay" class="auth-overlay hidden">
             <div class="auth-card">
@@ -258,6 +317,6 @@
             </div>
         </div>
     </div>
-    <script src="app.js?v=14"></script>
+    <script src="app.js?v=15"></script>
 </body>
 </html>

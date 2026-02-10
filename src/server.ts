@@ -8,12 +8,14 @@ import { modelsRoutes } from './routes/models.js'
 import { proxyRoutes } from './routes/proxy.js'
 import { adminRoutes } from './routes/admin.js'
 import { credentialManager } from './credentials/manager.js'
+import { modelManager } from './models/manager.js'
 
 const MAX_BODY_SIZE = 20 * 1024 * 1024 // 20MB - accommodate large PDFs/images (base64 encoded)
 
 const config = loadConfig()
 
 await credentialManager.init()
+await modelManager.init()
 
 const fastify = Fastify({
   logger: {

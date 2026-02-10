@@ -561,6 +561,22 @@ input:focus {
     box-shadow: var(--shadow-glow);
 }
 
+.form-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-btn);
+    background: var(--bg-input);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    max-width: 280px;
+}
+.form-select:focus {
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-glow);
+    outline: none;
+}
+
 .input-group {
     display: flex;
     gap: 0.5rem;

@@ -2,24 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { Config } from '../types.js'
 import { buildStealthHeaders } from '../services/headers.js'
 import { credentialManager } from '../credentials/manager.js'
-
-const FALLBACK_MODELS = {
-  object: 'list',
-  data: [
-    {
-      id: 'claude-opus-4-5-20251101',
-      object: 'model',
-      created: 1730419200,
-      owned_by: 'anthropic',
-    },
-    {
-      id: 'claude-sonnet-4-5-20250929',
-      object: 'model',
-      created: 1727568000,
-      owned_by: 'anthropic',
-    },
-  ],
-}
+import { modelManager } from '../models/manager.js'
 
 export async function modelsRoutes(fastify: FastifyInstance, config: Config) {
   fastify.get('/v1/models', async (request, reply) => {
@@ -28,7 +11,7 @@ export async function modelsRoutes(fastify: FastifyInstance, config: Config) {
     const apiKey = active?.apiKey || config.apiKey
 
     if (!targetUrl || !apiKey) {
-      return reply.send(FALLBACK_MODELS)
+      return reply.send(modelManager.getFallbackResponse())
     }
 
     const headers = buildStealthHeaders(apiKey)
@@ -52,6 +35,6 @@ export async function modelsRoutes(fastify: FastifyInstance, config: Config) {
     }
 
     reply.headers({ 'X-Proxy-Status': 'fallback' })
-    return reply.send(FALLBACK_MODELS)
+    return reply.send(modelManager.getFallbackResponse())
   })
 }
