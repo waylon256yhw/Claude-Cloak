@@ -3,6 +3,7 @@ export interface Credential {
   name: string
   targetUrl: string
   apiKey: string
+  proxyUrl?: string | null
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -17,12 +18,14 @@ export interface CreateCredentialInput {
   name: string
   targetUrl: string
   apiKey: string
+  proxyUrl?: string | null
 }
 
 export interface UpdateCredentialInput {
   name?: string
   targetUrl?: string
   apiKey?: string
+  proxyUrl?: string | null
 }
 
 export interface CredentialSafe {
@@ -31,6 +34,7 @@ export interface CredentialSafe {
   targetUrl: string
   keyMasked: string
   keyLast4: string
+  proxyUrl?: string | null
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -50,8 +54,22 @@ export function maskCredential(cred: Credential): CredentialSafe {
     targetUrl: cred.targetUrl,
     keyMasked: keyLength >= MIN_KEY_LENGTH_FOR_MASKING ? `...${last4}` : '****',
     keyLast4: last4,
+    proxyUrl: cred.proxyUrl ? maskProxyUrl(cred.proxyUrl) : cred.proxyUrl,
     isActive: cred.isActive,
     createdAt: cred.createdAt,
     updatedAt: cred.updatedAt,
+  }
+}
+
+function maskProxyUrl(raw: string): string {
+  try {
+    const url = new URL(raw)
+    if (url.username || url.password) {
+      url.username = '***'
+      url.password = '***'
+    }
+    return url.toString().replace(/\/$/, '')
+  } catch {
+    return raw
   }
 }

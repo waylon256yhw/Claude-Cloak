@@ -4,16 +4,18 @@ import { buildStealthHeaders } from '../services/headers.js'
 import { enhanceAnthropicRequest } from '../services/transform.js'
 import { pipeStream } from '../services/stream.js'
 import { credentialManager } from '../credentials/manager.js'
+import { resolveProxyUrl, proxyFetch } from '../services/proxy-fetch.js'
 
 interface UpstreamConfig {
   targetUrl: string
   apiKey: string
+  proxyUrl?: string | null
 }
 
 function getUpstreamConfig(config: Config): UpstreamConfig {
   const active = credentialManager.getActive()
   if (active) {
-    return { targetUrl: active.targetUrl, apiKey: active.apiKey }
+    return { targetUrl: active.targetUrl, apiKey: active.apiKey, proxyUrl: active.proxyUrl }
   }
   if (config.targetUrl && config.apiKey) {
     return { targetUrl: config.targetUrl, apiKey: config.apiKey }
@@ -57,12 +59,12 @@ async function proxyToClaude(
   const initialTimeout = setTimeout(() => controller.abort(), config.requestTimeout)
 
   try {
-    const response = await fetch(`${upstream.targetUrl}/v1/messages`, {
+    const response = await proxyFetch(`${upstream.targetUrl}/v1/messages`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
       signal: controller.signal,
-    })
+    }, resolveProxyUrl(upstream.proxyUrl, config.outboundProxy))
 
     clearTimeout(initialTimeout)
 

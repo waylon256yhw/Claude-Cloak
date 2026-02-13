@@ -7,6 +7,7 @@ import { settingsManager, type Settings } from '../settings/manager.js'
 import { sensitiveWordsManager } from '../sensitive-words/manager.js'
 import { modelManager } from '../models/manager.js'
 import { buildStealthHeaders } from '../services/headers.js'
+import { resolveProxyUrl, proxyFetch } from '../services/proxy-fetch.js'
 
 interface IdParams {
   id: string
@@ -46,7 +47,7 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
   })
 
   fastify.post<{ Body: CreateCredentialInput }>('/credentials', async (request, reply) => {
-    const { name, targetUrl, apiKey } = request.body || {}
+    const { name, targetUrl, apiKey, proxyUrl } = request.body || {}
     if (!name || !targetUrl || !apiKey) {
       reply.code(400).send({ error: 'Bad Request', message: 'Missing required fields: name, targetUrl, apiKey' })
       return
@@ -56,7 +57,7 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
       return
     }
     try {
-      const created = await credentialManager.create({ name, targetUrl, apiKey })
+      const created = await credentialManager.create({ name, targetUrl, apiKey, proxyUrl })
       return maskCredential(created)
     } catch (err) {
       handleCrudError(reply, err)
@@ -88,7 +89,8 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
 
   fastify.post<{ Params: IdParams }>('/credentials/:id/activate', async (request, reply) => {
     try {
-      return await credentialManager.activate(request.params.id)
+      const cred = await credentialManager.activate(request.params.id)
+      return maskCredential(cred)
     } catch (err) {
       handleCrudError(reply, err)
     }
@@ -106,7 +108,7 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
     const startTime = Date.now()
 
     try {
-      const res = await fetch(`${cred.targetUrl}/v1/messages`, {
+      const res = await proxyFetch(`${cred.targetUrl}/v1/messages`, {
         method: 'POST',
         headers: buildStealthHeaders(cred.apiKey, false),
         body: JSON.stringify({
@@ -116,7 +118,7 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
           messages: [{ role: 'user', content: 'Hi' }]
         }),
         signal: controller.signal
-      })
+      }, resolveProxyUrl(cred.proxyUrl, config.outboundProxy))
 
       clearTimeout(timeout)
       const latencyMs = Date.now() - startTime

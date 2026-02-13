@@ -3,6 +3,7 @@ import type { Config } from '../types.js'
 import { buildStealthHeaders } from '../services/headers.js'
 import { credentialManager } from '../credentials/manager.js'
 import { modelManager } from '../models/manager.js'
+import { resolveProxyUrl, proxyFetch } from '../services/proxy-fetch.js'
 
 export async function modelsRoutes(fastify: FastifyInstance, config: Config) {
   fastify.get('/v1/models', async (request, reply) => {
@@ -16,11 +17,13 @@ export async function modelsRoutes(fastify: FastifyInstance, config: Config) {
 
     const headers = buildStealthHeaders(apiKey)
 
+    const proxyUrl = resolveProxyUrl(active?.proxyUrl, config.outboundProxy)
+
     try {
-      const response = await fetch(`${targetUrl}/v1/models`, {
+      const response = await proxyFetch(`${targetUrl}/v1/models`, {
         method: 'GET',
         headers,
-      })
+      }, proxyUrl)
 
       if (response.ok) {
         const data = await response.text()

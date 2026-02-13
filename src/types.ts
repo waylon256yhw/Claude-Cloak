@@ -6,6 +6,7 @@ export interface Config {
   requestTimeout: number
   testRequestTimeout: number
   logLevel: string
+  outboundProxy: string | null
 }
 
 export interface ClaudeSystemBlock {

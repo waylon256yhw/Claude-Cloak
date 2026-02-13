@@ -454,6 +454,7 @@ function renderList() {
             <div class="card-details">
                 <div class="detail-row"><span>Target</span><span class="code" title="${esc(cred.targetUrl)}">${esc(cred.targetUrl)}</span></div>
                 <div class="detail-row"><span>Key</span><span class="code">${esc(cred.keyMasked)}</span></div>
+                ${cred.proxyUrl ? `<div class="detail-row"><span>Proxy</span><span class="code" title="${esc(cred.proxyUrl)}">${esc(cred.proxyUrl)}</span></div>` : ''}
             </div>
             <div class="card-actions">
                 ${!cred.isActive ? `<button class="btn-icon" data-action="activate" data-id="${cred.id}" title="Activate">${icons.power}</button>` : ''}
@@ -489,17 +490,18 @@ els.form.addEventListener('submit', async (e) => {
     const apiKeyValue = document.getElementById('apiKey').value.trim();
     const isEdit = !!editId;
 
+    const proxyUrlValue = document.getElementById('proxyUrl').value.trim();
     const data = {
         id: editId,
         name: document.getElementById('name').value,
         targetUrl: document.getElementById('targetUrl').value
     };
 
-    // Only include apiKey if:
-    // 1. Adding new credential (isEdit=false), or
-    // 2. Editing and user provided a new key
     if (!isEdit || apiKeyValue) {
         data.apiKey = apiKeyValue;
+    }
+    if (!isEdit || proxyUrlValue) {
+        data.proxyUrl = proxyUrlValue || null;
     }
 
     await saveCredential(data);
@@ -517,24 +519,26 @@ function openModal(cred = null) {
     document.getElementById('editId').value = cred ? cred.id : '';
     document.getElementById('name').value = cred ? cred.name : '';
     document.getElementById('targetUrl').value = cred ? cred.targetUrl : '';
-
+    const proxyUrlInput = document.getElementById('proxyUrl');
     const apiKeyInput = document.getElementById('apiKey');
     const currentKeyDisplay = document.getElementById('currentKeyDisplay');
     const currentKeyMasked = document.getElementById('currentKeyMasked');
 
     if (isEdit) {
-        // Edit mode: show current masked key, clear input
         apiKeyInput.value = '';
         apiKeyInput.removeAttribute('required');
         apiKeyInput.placeholder = 'Leave blank to keep existing key';
         currentKeyMasked.textContent = cred.keyMasked || '****';
         currentKeyDisplay.classList.remove('hidden');
+        proxyUrlInput.value = '';
+        proxyUrlInput.placeholder = cred.proxyUrl ? `Current: ${cred.proxyUrl}` : 'http://user:pass@host:port';
     } else {
-        // Add mode: require key
         apiKeyInput.value = '';
         apiKeyInput.setAttribute('required', 'required');
         apiKeyInput.placeholder = 'sk-ant-...';
         currentKeyDisplay.classList.add('hidden');
+        proxyUrlInput.value = '';
+        proxyUrlInput.placeholder = 'http://user:pass@host:port';
     }
 
     els.modal.classList.remove('hidden');

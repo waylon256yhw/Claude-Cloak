@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { CredentialStorage } from './storage.js'
 import type { Credential, CredentialStore, CreateCredentialInput, UpdateCredentialInput } from './types.js'
+import { validateProxyUrl } from '../services/proxy-fetch.js'
 
 class Mutex {
   private locked = false
@@ -79,6 +80,7 @@ export class CredentialManager {
         name: input.name,
         targetUrl: validateTargetUrl(input.targetUrl),
         apiKey: input.apiKey,
+        proxyUrl: input.proxyUrl ? validateProxyUrl(input.proxyUrl) : null,
         isActive: isFirst,
         createdAt: now,
         updatedAt: now,
@@ -105,6 +107,9 @@ export class CredentialManager {
         name: input.name ?? existing.name,
         targetUrl: input.targetUrl ? validateTargetUrl(input.targetUrl) : existing.targetUrl,
         apiKey: (input.apiKey && input.apiKey.trim()) ? input.apiKey.trim() : existing.apiKey,
+        proxyUrl: input.proxyUrl !== undefined
+          ? (input.proxyUrl ? validateProxyUrl(input.proxyUrl) : null)
+          : existing.proxyUrl,
         updatedAt: new Date().toISOString(),
       }
       this.store.credentials[idx] = updated
