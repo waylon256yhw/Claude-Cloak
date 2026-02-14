@@ -2,19 +2,21 @@ import { join } from 'node:path'
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
 import { loadConfig } from './config.js'
-import { createAuthHook } from './services/auth.js'
+import { createAdminAuthHook, createProxyAuthHook } from './services/auth.js'
 import { healthRoutes } from './routes/health.js'
 import { modelsRoutes } from './routes/models.js'
 import { proxyRoutes } from './routes/proxy.js'
 import { adminRoutes } from './routes/admin.js'
 import { credentialManager } from './credentials/manager.js'
+import { apiKeyManager } from './apikeys/manager.js'
 import { modelManager } from './models/manager.js'
 
-const MAX_BODY_SIZE = 20 * 1024 * 1024 // 20MB - accommodate large PDFs/images (base64 encoded)
+const MAX_BODY_SIZE = 20 * 1024 * 1024
 
 const config = loadConfig()
 
 await credentialManager.init()
+await apiKeyManager.init()
 await modelManager.init()
 
 const fastify = Fastify({
@@ -38,28 +40,15 @@ await fastify.register(fastifyStatic, {
   decorateReply: false,
 })
 
+const adminAuthHook = createAdminAuthHook(config)
 await fastify.register(async (instance) => {
+  instance.addHook('preHandler', adminAuthHook)
   await adminRoutes(instance, config)
 }, { prefix: '/admin/api' })
 
-const authHook = createAuthHook(config)
-fastify.addHook('preHandler', async (request, reply) => {
-  // Skip auth for health check endpoints and root redirect
-  if (request.url === '/' || request.url === '/healthz' || request.url === '/health') {
-    return
-  }
-
-  // Skip auth for admin static files only (not API endpoints)
-  // /admin/ -> index.html, /admin/styles.css, /admin/app.js, etc.
-  // But /admin/api/* requires authentication
-  if (request.url.startsWith('/admin/') && !request.url.startsWith('/admin/api/')) {
-    return
-  }
-
-  return authHook(request, reply)
-})
-
+const proxyAuthHook = createProxyAuthHook()
 await fastify.register(async (instance) => {
+  instance.addHook('preHandler', proxyAuthHook)
   await modelsRoutes(instance, config)
   await proxyRoutes(instance, config)
 })

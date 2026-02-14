@@ -18,17 +18,36 @@ export class CredentialStorage {
       if (!parsed || typeof parsed !== 'object') {
         throw new Error('Invalid store format')
       }
-      return {
-        credentials: Array.isArray(parsed.credentials) ? parsed.credentials : [],
-        activeId: parsed.activeId || null,
+
+      const credentials = Array.isArray(parsed.credentials) ? parsed.credentials : []
+      let needsMigration = false
+
+      if ('activeId' in parsed) {
+        needsMigration = true
       }
+
+      for (const cred of credentials) {
+        if ('isActive' in cred && !('enabled' in cred)) {
+          cred.enabled = true
+          delete cred.isActive
+          needsMigration = true
+        }
+      }
+
+      const store: CredentialStore = { credentials }
+
+      if (needsMigration) {
+        await this.write(store)
+      }
+
+      return store
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code
       if (code === 'ENOENT') {
-        return { credentials: [], activeId: null }
+        return { credentials: [] }
       }
       console.error('Failed to read credential store:', err)
-      return { credentials: [], activeId: null }
+      return { credentials: [] }
     }
   }
 

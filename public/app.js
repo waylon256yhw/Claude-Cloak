@@ -4,6 +4,7 @@ const AUTH_STORAGE_KEY = 'claude_admin_proxy_key';
 const IDLE_LOGOUT_MS = 30 * 60 * 1000; // 30 minutes, set to 0 to disable
 
 let credentials = [];
+let apiKeys = [];
 let fallbackModels = [];
 let modelTestModelId = '';
 let sensitiveWords = [];
@@ -224,6 +225,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             resetIdleLogoutTimer();
 
             loadCredentials();
+            loadApiKeys();
             loadSettings();
             loadSensitiveWords();
             loadModels();
@@ -248,8 +250,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const authed = await ensureAuthenticated();
     if (authed) {
         loadCredentials();
+        loadApiKeys();
         loadSettings();
         loadSensitiveWords();
+        loadModels();
     }
 });
 
@@ -334,18 +338,10 @@ async function deleteCredential(id) {
     } catch (e) { /* handled */ }
 }
 
-async function activateCredential(id) {
-    const cred = credentials.find(c => c.id === id);
-    if (!cred) return;
-    const confirmed = await showConfirm({
-        title: 'Switch Credential',
-        message: `Activate "${cred.name}" as the primary credential?`,
-        icon: 'power'
-    });
-    if (!confirmed) return;
+async function toggleCredential(id, enabled) {
     try {
-        await api(`/credentials/${id}/activate`, { method: 'POST' });
-        showToast('Active credential switched', 'success');
+        await api(`/credentials/${id}/toggle`, { method: 'POST', body: JSON.stringify({ enabled }) });
+        showToast(`Credential ${enabled ? 'enabled' : 'disabled'}`, 'success');
         loadCredentials();
     } catch (e) { /* handled */ }
 }
@@ -440,16 +436,19 @@ function renderList() {
             <div class="empty-state">
                 <div class="empty-state-icon">📂</div>
                 <h3>No credentials yet</h3>
-                <p>Add a new API key to start proxying requests.</p>
+                <p>Add an upstream credential to start proxying requests.</p>
             </div>
         `;
         return;
     }
     els.list.innerHTML = credentials.map(cred => `
-        <div class="card ${cred.isActive ? 'active' : ''}">
+        <div class="card ${cred.enabled ? '' : 'cred-disabled'}">
             <div class="card-header">
                 <span class="card-title">${esc(cred.name)}</span>
-                <span class="status-badge ${cred.isActive ? 'active' : ''}" title="${cred.isActive ? 'Active' : 'Standby'}">${icons.pulse}</span>
+                <label class="toggle-switch" title="${cred.enabled ? 'Enabled' : 'Disabled'}">
+                    <input type="checkbox" data-action="toggle" data-id="${cred.id}" ${cred.enabled ? 'checked' : ''}>
+                    <span class="toggle-slider"></span>
+                </label>
             </div>
             <div class="card-details">
                 <div class="detail-row"><span>Target</span><span class="code" title="${esc(cred.targetUrl)}">${esc(cred.targetUrl)}</span></div>
@@ -457,7 +456,6 @@ function renderList() {
                 ${cred.proxyUrl ? `<div class="detail-row"><span>Proxy</span><span class="code" title="${esc(cred.proxyUrl)}">${esc(cred.proxyUrl)}</span></div>` : ''}
             </div>
             <div class="card-actions">
-                ${!cred.isActive ? `<button class="btn-icon" data-action="activate" data-id="${cred.id}" title="Activate">${icons.power}</button>` : ''}
                 <button class="btn-icon btn-test" data-action="test" data-id="${cred.id}" title="Test Connection"><span class="btn-content">${icons.lightning}</span></button>
                 <button class="btn-icon" data-action="edit" data-id="${cred.id}" title="Edit">${icons.faders}</button>
                 <button class="btn-icon btn-icon-danger" data-action="delete" data-id="${cred.id}" title="Delete">${icons.disconnect}</button>
@@ -465,6 +463,14 @@ function renderList() {
         </div>
     `).join('');
 }
+
+// Toggle switch needs change event (click on slider span won't reach the input via closest)
+els.list.addEventListener('change', (e) => {
+    const toggle = e.target.closest('[data-action="toggle"]');
+    if (toggle) {
+        toggleCredential(toggle.dataset.id, toggle.checked);
+    }
+});
 
 // Event delegation for card actions
 els.list.addEventListener('click', (e) => {
@@ -474,8 +480,7 @@ els.list.addEventListener('click', (e) => {
     const action = btn.dataset.action;
     const id = btn.dataset.id;
 
-    if (action === 'activate') activateCredential(id);
-    else if (action === 'edit') editCredential(id);
+    if (action === 'edit') editCredential(id);
     else if (action === 'delete') deleteCredential(id);
     else if (action === 'test') testCredential(btn, id);
 });
@@ -989,4 +994,149 @@ document.getElementById('modelsList')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-model-action]');
     if (!btn) return;
     if (btn.dataset.modelAction === 'delete') deleteModel(btn.dataset.id);
+});
+
+// --- API KEYS ---
+
+let apiKeyList = document.getElementById('apiKeyList');
+
+async function loadApiKeys() {
+    try {
+        apiKeys = await api('/apikeys');
+        renderApiKeys();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function renderApiKeys() {
+    if (!apiKeyList) return;
+    if (apiKeys.length === 0) {
+        apiKeyList.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🔑</div>
+                <h3>No API keys yet</h3>
+                <p>Create an API key to start accepting requests.</p>
+            </div>
+        `;
+        return;
+    }
+    apiKeyList.innerHTML = apiKeys.map(k => `
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">${esc(k.name)}</span>
+                <span class="apikey-credential-tag ${k.credentialName ? '' : 'unassigned'}">${k.credentialName ? esc(k.credentialName) : 'Unassigned'}</span>
+            </div>
+            <div class="card-details">
+                <div class="detail-row"><span>Key</span><span class="code">${esc(k.keyPreview)}</span></div>
+            </div>
+            <div class="card-actions">
+                <button class="btn-icon" data-apikey-action="edit" data-id="${k.id}" title="Edit">${icons.faders}</button>
+                <button class="btn-icon btn-icon-danger" data-apikey-action="delete" data-id="${k.id}" title="Delete">${icons.disconnect}</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function populateCredentialSelect(selectedId) {
+    const select = document.getElementById('apiKeyCredential');
+    if (!select) return;
+    const enabledCreds = credentials.filter(c => c.enabled);
+    const selectedInList = enabledCreds.some(c => c.id === selectedId);
+    let options = '';
+    if (selectedId && !selectedInList) {
+        const disabledCred = credentials.find(c => c.id === selectedId);
+        if (disabledCred) {
+            options += `<option value="${disabledCred.id}" selected>${esc(disabledCred.name)} (disabled)</option>`;
+        }
+    }
+    const placeholder = enabledCreds.length
+        ? '<option value="" disabled' + (!selectedId ? ' selected' : '') + '>Select a credential</option>'
+        : '<option value="" disabled selected>No enabled credentials</option>';
+    select.innerHTML = placeholder + options +
+        enabledCreds.map(c =>
+            `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)}</option>`
+        ).join('');
+}
+
+function openApiKeyModal(existing = null) {
+    const isEdit = !!existing;
+    document.getElementById('apiKeyModalTitle').textContent = isEdit ? 'Edit API Key' : 'New API Key';
+    document.getElementById('apiKeyEditId').value = existing ? existing.id : '';
+    document.getElementById('apiKeyName').value = existing ? existing.name : '';
+    populateCredentialSelect(existing?.credentialId);
+    document.getElementById('apiKeyModal').classList.remove('hidden');
+    document.getElementById('apiKeyName').focus();
+}
+
+function closeApiKeyModal() {
+    document.getElementById('apiKeyModal').classList.add('hidden');
+    document.getElementById('apiKeyForm').reset();
+}
+
+async function saveApiKey(data) {
+    const isEdit = !!data.id;
+    const method = isEdit ? 'PUT' : 'POST';
+    const url = isEdit ? `/apikeys/${data.id}` : '/apikeys';
+    try {
+        const result = await api(url, { method, body: JSON.stringify(data) });
+        closeApiKeyModal();
+        if (!isEdit && result.key) {
+            document.getElementById('createdApiKeyValue').textContent = result.key;
+            document.getElementById('apiKeyCreatedModal').classList.remove('hidden');
+        } else {
+            showToast('API key updated', 'success');
+        }
+        loadApiKeys();
+    } catch (e) { /* handled */ }
+}
+
+async function deleteApiKey(id) {
+    if (!await showConfirm({ title: 'Delete API Key', message: 'This action cannot be undone.', icon: 'trash', danger: true })) return;
+    try {
+        await api(`/apikeys/${id}`, { method: 'DELETE' });
+        showToast('API key deleted', 'success');
+        loadApiKeys();
+    } catch (e) { /* handled */ }
+}
+
+document.getElementById('btnAddApiKey')?.addEventListener('click', () => openApiKeyModal());
+document.getElementById('btnApiKeyModalClose')?.addEventListener('click', closeApiKeyModal);
+document.getElementById('btnApiKeyCancel')?.addEventListener('click', closeApiKeyModal);
+
+document.getElementById('apiKeyForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const editId = document.getElementById('apiKeyEditId').value || undefined;
+    const data = {
+        id: editId,
+        name: document.getElementById('apiKeyName').value.trim(),
+        credentialId: document.getElementById('apiKeyCredential').value || null
+    };
+    if (!data.credentialId) {
+        showToast('Please select a credential', 'error');
+        return;
+    }
+    await saveApiKey(data);
+});
+
+document.getElementById('btnCopyApiKey')?.addEventListener('click', () => {
+    const key = document.getElementById('createdApiKeyValue').textContent;
+    navigator.clipboard.writeText(key).then(() => showToast('Copied to clipboard', 'success'));
+});
+
+document.getElementById('btnApiKeyCreatedOk')?.addEventListener('click', () => {
+    document.getElementById('apiKeyCreatedModal').classList.add('hidden');
+});
+
+apiKeyList?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-apikey-action]');
+    if (!btn) return;
+    const action = btn.dataset.apikeyAction;
+    const id = btn.dataset.id;
+    if (action === 'edit') {
+        const k = apiKeys.find(a => a.id === id);
+        if (k) openApiKeyModal(k);
+    } else if (action === 'delete') {
+        deleteApiKey(id);
+    }
 });

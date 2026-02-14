@@ -1135,3 +1135,54 @@ input:focus {
 .collapsible-content.collapsed {
     display: none;
 }
+
+/* --- API KEY DISPLAY --- */
+.api-key-display {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1rem 0;
+    padding: 0.75rem 1rem;
+    background: var(--bg-code);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-btn);
+}
+
+.api-key-display code {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-main);
+    word-break: break-all;
+    user-select: all;
+}
+
+/* --- CREDENTIAL ENABLED/DISABLED STATE --- */
+.card.cred-disabled {
+    opacity: 0.55;
+}
+
+.card.cred-disabled:hover {
+    opacity: 0.75;
+}
+
+/* --- FULL WIDTH SELECT --- */
+.form-select.full-width {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* --- API KEY CARD CREDENTIAL TAG --- */
+.apikey-credential-tag {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    background: var(--accent-surface);
+    color: var(--accent-primary);
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.apikey-credential-tag.unassigned {
+    background: var(--bg-panel-hover);
+    color: var(--text-muted);
+}

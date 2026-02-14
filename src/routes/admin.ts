@@ -3,6 +3,9 @@ import type { Config } from '../types.js'
 import { credentialManager } from '../credentials/manager.js'
 import type { CreateCredentialInput, UpdateCredentialInput } from '../credentials/types.js'
 import { maskCredential } from '../credentials/types.js'
+import { apiKeyManager } from '../apikeys/manager.js'
+import type { CreateApiKeyInput, UpdateApiKeyInput } from '../apikeys/types.js'
+import { maskApiKey } from '../apikeys/types.js'
 import { settingsManager, type Settings } from '../settings/manager.js'
 import { sensitiveWordsManager } from '../sensitive-words/manager.js'
 import { modelManager } from '../models/manager.js'
@@ -87,9 +90,14 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
     }
   })
 
-  fastify.post<{ Params: IdParams }>('/credentials/:id/activate', async (request, reply) => {
+  fastify.post<{ Params: IdParams; Body: { enabled: boolean } }>('/credentials/:id/toggle', async (request, reply) => {
+    const { enabled } = request.body || {}
+    if (typeof enabled !== 'boolean') {
+      reply.code(400).send({ error: 'Bad Request', message: 'enabled must be boolean' })
+      return
+    }
     try {
-      const cred = await credentialManager.activate(request.params.id)
+      const cred = await credentialManager.setEnabled(request.params.id, enabled)
       return maskCredential(cred)
     } catch (err) {
       handleCrudError(reply, err)
@@ -147,14 +155,73 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
       }
     }
   })
+}
 
-  fastify.get('/active', async (request, reply) => {
-    const active = credentialManager.getActive()
-    if (!active) {
-      reply.code(404).send({ error: 'Not Found', message: 'No active credential configured' })
+async function registerApiKeyRoutes(fastify: FastifyInstance): Promise<void> {
+  fastify.get('/apikeys', async () => {
+    const keys = apiKeyManager.getAll()
+    return keys.map((k) => {
+      const cred = k.credentialId ? credentialManager.getById(k.credentialId) : null
+      return maskApiKey(k, cred?.name ?? null)
+    })
+  })
+
+  fastify.post<{ Body: CreateApiKeyInput }>('/apikeys', async (request, reply) => {
+    const { name, credentialId } = request.body || {}
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      reply.code(400).send({ error: 'Bad Request', message: 'Missing required field: name' })
       return
     }
-    return { id: active.id, name: active.name, targetUrl: active.targetUrl }
+    if (!credentialId || typeof credentialId !== 'string') {
+      reply.code(400).send({ error: 'Bad Request', message: 'Missing required field: credentialId' })
+      return
+    }
+    if (!credentialManager.getById(credentialId)) {
+      reply.code(400).send({ error: 'Bad Request', message: 'Credential not found' })
+      return
+    }
+    try {
+      const created = await apiKeyManager.create({ name: name.trim(), credentialId })
+      const cred = created.credentialId ? credentialManager.getById(created.credentialId) : null
+      return {
+        ...maskApiKey(created, cred?.name ?? null),
+        key: created.key,
+      }
+    } catch (err) {
+      handleCrudError(reply, err)
+    }
+  })
+
+  fastify.put<{ Params: IdParams; Body: UpdateApiKeyInput }>('/apikeys/:id', async (request, reply) => {
+    const { name, credentialId } = request.body || {}
+    if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+      reply.code(400).send({ error: 'Bad Request', message: 'name must be a non-empty string' })
+      return
+    }
+    if (credentialId !== undefined) {
+      if (!credentialId || typeof credentialId !== 'string' || !credentialManager.getById(credentialId)) {
+        reply.code(400).send({ error: 'Bad Request', message: 'Credential not found' })
+        return
+      }
+    }
+    try {
+      const input: UpdateApiKeyInput = { ...request.body }
+      if (input.name) input.name = input.name.trim()
+      const updated = await apiKeyManager.update(request.params.id, input)
+      const cred = updated.credentialId ? credentialManager.getById(updated.credentialId) : null
+      return maskApiKey(updated, cred?.name ?? null)
+    } catch (err) {
+      handleCrudError(reply, err)
+    }
+  })
+
+  fastify.delete<{ Params: IdParams }>('/apikeys/:id', async (request, reply) => {
+    try {
+      await apiKeyManager.remove(request.params.id)
+      return { success: true }
+    } catch (err) {
+      handleCrudError(reply, err)
+    }
   })
 }
 
@@ -311,6 +378,7 @@ async function registerModelRoutes(fastify: FastifyInstance): Promise<void> {
 
 export async function adminRoutes(fastify: FastifyInstance, config: Config) {
   await registerCredentialRoutes(fastify, config)
+  await registerApiKeyRoutes(fastify)
   await registerSettingsRoutes(fastify)
   await registerSensitiveWordsRoutes(fastify)
   await registerModelRoutes(fastify)

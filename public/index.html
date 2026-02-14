@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claude Cloak - Admin</title>
-    <link rel="stylesheet" href="styles.css?v=15">
+    <link rel="stylesheet" href="styles.css?v=16">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22 fill=%22%230d9488%22><path d=%22M50 8C27 8 10 27 10 52V90L50 73L90 90V52C90 27 73 8 50 8Z%22/></svg>">
 </head>
 <body>
@@ -54,7 +54,7 @@
                         <div class="guide-section">
                             <h4>Example</h4>
                             <pre class="code-pre">curl https://your-domain/v1/messages \
-  -H "x-api-key: YOUR_PROXY_KEY" \
+  -H "x-api-key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"claude-sonnet-4-20250514","max_tokens":1024,"messages":[{"role":"user","content":"Hello"}]}'</pre>
                         </div>
@@ -62,7 +62,13 @@
                 </div>
 
                 <div class="section-header">
-                    <h2>API Credentials</h2>
+                    <h2>API Keys</h2>
+                    <button id="btnAddApiKey" class="btn btn-primary">+ New API Key</button>
+                </div>
+                <div id="apiKeyList" class="card-grid"></div>
+
+                <div class="section-header" style="margin-top: 2.5rem;">
+                    <h2>Upstream Credentials</h2>
                     <button id="btnAdd" class="btn btn-primary">+ Add Credential</button>
                 </div>
                 <div id="credentialList" class="card-grid"></div>
@@ -292,6 +298,51 @@
             </div>
         </div>
 
+        <!-- API Key Modal -->
+        <div id="apiKeyModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="apiKeyModalTitle">New API Key</h3>
+                    <button class="btn-close" id="btnApiKeyModalClose">&times;</button>
+                </div>
+                <form id="apiKeyForm">
+                    <input type="hidden" id="apiKeyEditId">
+                    <div class="form-group">
+                        <label for="apiKeyName">Name</label>
+                        <input type="text" id="apiKeyName" required placeholder="e.g., Alice">
+                    </div>
+                    <div class="form-group">
+                        <label for="apiKeyCredential">Credential</label>
+                        <select id="apiKeyCredential" class="form-select full-width">
+                            <option value="" disabled selected>Select a credential</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" id="btnApiKeyCancel">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- API Key Created Modal -->
+        <div id="apiKeyCreatedModal" class="modal hidden">
+            <div class="modal-content compact">
+                <div class="confirm-icon" style="background: rgba(13, 148, 136, 0.15); color: var(--accent-primary);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 7h2a2 2 0 012 2v8a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2h2m4-4H8a1 1 0 00-1 1v2h10V4a1 1 0 00-1-1z"/></svg>
+                </div>
+                <h3>API Key Created</h3>
+                <p>Copy this key now. You won't be able to see it again.</p>
+                <div class="api-key-display">
+                    <code id="createdApiKeyValue"></code>
+                    <button type="button" class="btn btn-sm btn-secondary" id="btnCopyApiKey">Copy</button>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-primary" id="btnApiKeyCreatedOk">Done</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Admin Login Overlay -->
         <div id="authOverlay" class="auth-overlay hidden">
             <div class="auth-card">
@@ -321,6 +372,6 @@
             </div>
         </div>
     </div>
-    <script src="app.js?v=15"></script>
+    <script src="app.js?v=16"></script>
 </body>
 </html>

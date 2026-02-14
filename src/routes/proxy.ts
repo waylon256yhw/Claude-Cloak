@@ -12,10 +12,13 @@ interface UpstreamConfig {
   proxyUrl?: string | null
 }
 
-function getUpstreamConfig(config: Config): UpstreamConfig {
-  const active = credentialManager.getActive()
-  if (active) {
-    return { targetUrl: active.targetUrl, apiKey: active.apiKey, proxyUrl: active.proxyUrl }
+function getUpstreamConfig(request: FastifyRequest, config: Config): UpstreamConfig {
+  const apiKeyEntity = request.apiKeyEntity
+  if (apiKeyEntity?.credentialId) {
+    const cred = credentialManager.getById(apiKeyEntity.credentialId)
+    if (cred?.enabled) {
+      return { targetUrl: cred.targetUrl, apiKey: cred.apiKey, proxyUrl: cred.proxyUrl }
+    }
   }
   if (config.targetUrl && config.apiKey) {
     return { targetUrl: config.targetUrl, apiKey: config.apiKey }
@@ -39,7 +42,7 @@ async function proxyToClaude(
 ) {
   let upstream: UpstreamConfig
   try {
-    upstream = getUpstreamConfig(config)
+    upstream = getUpstreamConfig(request, config)
   } catch (err) {
     reply.code(503).send({ error: 'Service Unavailable', message: (err as Error).message })
     return
@@ -49,13 +52,11 @@ async function proxyToClaude(
   const headers = buildStealthHeaders(upstream.apiKey, isStream)
   const controller = new AbortController()
 
-  // Listen to both request and response close events
   const cleanup = () => controller.abort()
   request.raw.on('close', cleanup)
   request.raw.on('aborted', cleanup)
   reply.raw.on('close', cleanup)
 
-  // Initial timeout for connection
   const initialTimeout = setTimeout(() => controller.abort(), config.requestTimeout)
 
   try {
@@ -93,7 +94,6 @@ async function proxyToClaude(
     }
     throw err
   } finally {
-    // Clean up listeners for non-streaming case
     request.raw.off('close', cleanup)
     request.raw.off('aborted', cleanup)
     reply.raw.off('close', cleanup)

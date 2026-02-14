@@ -4,14 +4,13 @@ export interface Credential {
   targetUrl: string
   apiKey: string
   proxyUrl?: string | null
-  isActive: boolean
+  enabled: boolean
   createdAt: string
   updatedAt: string
 }
 
 export interface CredentialStore {
   credentials: Credential[]
-  activeId: string | null
 }
 
 export interface CreateCredentialInput {
@@ -35,7 +34,7 @@ export interface CredentialSafe {
   keyMasked: string
   keyLast4: string
   proxyUrl?: string | null
-  isActive: boolean
+  enabled: boolean
   createdAt: string
   updatedAt: string
 }
@@ -55,7 +54,7 @@ export function maskCredential(cred: Credential): CredentialSafe {
     keyMasked: keyLength >= MIN_KEY_LENGTH_FOR_MASKING ? `...${last4}` : '****',
     keyLast4: last4,
     proxyUrl: cred.proxyUrl ? maskProxyUrl(cred.proxyUrl) : cred.proxyUrl,
-    isActive: cred.isActive,
+    enabled: cred.enabled,
     createdAt: cred.createdAt,
     updatedAt: cred.updatedAt,
   }

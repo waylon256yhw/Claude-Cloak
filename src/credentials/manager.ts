@@ -2,29 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { CredentialStorage } from './storage.js'
 import type { Credential, CredentialStore, CreateCredentialInput, UpdateCredentialInput } from './types.js'
 import { validateProxyUrl } from '../services/proxy-fetch.js'
-
-class Mutex {
-  private locked = false
-  private queue: (() => void)[] = []
-
-  async acquire(): Promise<void> {
-    if (!this.locked) {
-      this.locked = true
-      return
-    }
-    await new Promise<void>((resolve) => this.queue.push(resolve))
-  }
-
-  release(): void {
-    const next = this.queue.shift()
-    if (next) {
-      next()
-    } else {
-      this.locked = false
-    }
-  }
-}
-
+import { Mutex } from '../utils/mutex.js'
 
 function validateTargetUrl(raw: string): string {
   const trimmed = raw.trim()
@@ -41,7 +19,7 @@ function validateTargetUrl(raw: string): string {
 }
 
 export class CredentialManager {
-  private store: CredentialStore = { credentials: [], activeId: null }
+  private store: CredentialStore = { credentials: [] }
   private storage: CredentialStorage
   private mutex = new Mutex()
 
@@ -51,10 +29,6 @@ export class CredentialManager {
 
   async init(): Promise<void> {
     this.store = await this.storage.read()
-    if (!this.store.activeId && this.store.credentials.length > 0) {
-      const active = this.store.credentials.find((c) => c.isActive)
-      this.store.activeId = active?.id || null
-    }
   }
 
   getAll(): Credential[] {
@@ -65,30 +39,21 @@ export class CredentialManager {
     return this.store.credentials.find((c) => c.id === id)
   }
 
-  getActive(): Credential | undefined {
-    if (!this.store.activeId) return undefined
-    return this.store.credentials.find((c) => c.id === this.store.activeId)
-  }
-
   async create(input: CreateCredentialInput): Promise<Credential> {
     await this.mutex.acquire()
     try {
       const now = new Date().toISOString()
-      const isFirst = this.store.credentials.length === 0
       const cred: Credential = {
         id: randomUUID(),
         name: input.name,
         targetUrl: validateTargetUrl(input.targetUrl),
         apiKey: input.apiKey,
         proxyUrl: input.proxyUrl ? validateProxyUrl(input.proxyUrl) : null,
-        isActive: isFirst,
+        enabled: true,
         createdAt: now,
         updatedAt: now,
       }
       this.store.credentials.push(cred)
-      if (isFirst) {
-        this.store.activeId = cred.id
-      }
       await this.storage.write(this.store)
       return cred
     } finally {
@@ -126,27 +91,19 @@ export class CredentialManager {
       const idx = this.store.credentials.findIndex((c) => c.id === id)
       if (idx === -1) throw new Error('Credential not found')
       this.store.credentials.splice(idx, 1)
-      if (this.store.activeId === id) {
-        this.store.activeId = null
-        this.store.credentials.forEach((c) => (c.isActive = false))
-        if (this.store.credentials.length > 0) {
-          this.store.credentials[0].isActive = true
-          this.store.activeId = this.store.credentials[0].id
-        }
-      }
       await this.storage.write(this.store)
     } finally {
       this.mutex.release()
     }
   }
 
-  async activate(id: string): Promise<Credential> {
+  async setEnabled(id: string, enabled: boolean): Promise<Credential> {
     await this.mutex.acquire()
     try {
       const cred = this.store.credentials.find((c) => c.id === id)
       if (!cred) throw new Error('Credential not found')
-      this.store.credentials.forEach((c) => (c.isActive = c.id === id))
-      this.store.activeId = id
+      cred.enabled = enabled
+      cred.updatedAt = new Date().toISOString()
       await this.storage.write(this.store)
       return cred
     } finally {

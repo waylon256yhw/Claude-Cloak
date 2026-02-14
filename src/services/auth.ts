@@ -1,45 +1,58 @@
 import { timingSafeEqual } from 'node:crypto'
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import type { Config } from '../types.js'
+import type { ApiKey } from '../apikeys/types.js'
+import { apiKeyManager } from '../apikeys/manager.js'
 
-export function createAuthHook(config: Config) {
-  return async function authHook(request: FastifyRequest, reply: FastifyReply) {
+declare module 'fastify' {
+  interface FastifyRequest {
+    apiKeyEntity?: ApiKey
+  }
+}
+
+export function createAdminAuthHook(config: Config) {
+  return async function adminAuthHook(request: FastifyRequest, reply: FastifyReply) {
     const key = extractApiKey(request)
-
     if (!key) {
-      reply.code(401).send({
-        error: 'Unauthorized',
-        message: 'Missing API key. Use Authorization: Bearer <key> or x-api-key header',
-      })
+      reply.code(401).send({ error: 'Unauthorized', message: 'Missing API key' })
       return reply
     }
 
-    // Use timing-safe comparison to prevent timing attacks
     const keyBuffer = Buffer.from(key)
-    const proxyKeyBuffer = Buffer.from(config.proxyKey)
-
-    // Only compare if lengths match (timingSafeEqual requires same length)
-    const isValid = keyBuffer.length === proxyKeyBuffer.length &&
-      timingSafeEqual(keyBuffer, proxyKeyBuffer)
+    const adminBuffer = Buffer.from(config.adminKey)
+    const isValid = keyBuffer.length === adminBuffer.length && timingSafeEqual(keyBuffer, adminBuffer)
 
     if (!isValid) {
-      reply.code(401).send({
-        error: 'Unauthorized',
-        message: 'Invalid API key',
-      })
+      reply.code(401).send({ error: 'Unauthorized', message: 'Invalid admin key' })
       return reply
     }
   }
 }
 
+export function createProxyAuthHook() {
+  return async function proxyAuthHook(request: FastifyRequest, reply: FastifyReply) {
+    const key = extractApiKey(request)
+    if (!key) {
+      reply.code(401).send({ error: 'Unauthorized', message: 'Missing API key. Use Authorization: Bearer <key> or x-api-key header' })
+      return reply
+    }
+
+    const matched = apiKeyManager.resolve(key)
+    if (!matched) {
+      reply.code(401).send({ error: 'Unauthorized', message: 'Invalid API key' })
+      return reply
+    }
+
+    request.apiKeyEntity = matched
+  }
+}
+
 function extractApiKey(request: FastifyRequest): string | null {
-  // 1. x-api-key header
   const xApiKey = request.headers['x-api-key']
   if (xApiKey && typeof xApiKey === 'string') {
     return xApiKey
   }
 
-  // 2. Authorization: Bearer <key>
   const authHeader = request.headers.authorization
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.slice(7)
