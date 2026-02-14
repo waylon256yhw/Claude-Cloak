@@ -28,7 +28,8 @@
 - **系统提示注入**：自动注入 Claude Code 身份标识
 - **隐身请求头**：模拟真实的 Claude CLI 请求头
 - **SSE 流式传输**：完整支持流式响应，带背压处理
-- **多凭证管理**：存储多个上游 API 凭证，运行时切换
+- **多凭证管理**：存储多个上游 API 凭证，支持启用/禁用切换
+- **多 API Key**：为用户分发独立的 API Key，每个 Key 绑定一个上游凭证
 - **严格模式**：剥离所有用户系统消息，仅保留 Claude Code 提示
 - **敏感词混淆**：Aho-Corasick 单次扫描，自动混淆可配置的敏感词
 - **参数规范化**：剥离不支持的参数（top_p）防止上游错误
@@ -64,7 +65,7 @@ docker run -d \
   -p 4000:4000 \
   -e TARGET_URL=https://api.anthropic.com \
   -e API_KEY=sk-ant-xxx \
-  -e PROXY_KEY=your-secret \
+  -e ADMIN_KEY=your-secret \
   -v ./data:/app/data \
   ghcr.io/waylon256yhw/claude-cloak:latest
 ```
@@ -82,7 +83,7 @@ docker run -d \
 **必需环境变量：**
 - `TARGET_URL` - 上游 API 基础 URL（如 `https://api.anthropic.com`）
 - `API_KEY` - 上游 API 凭证
-- `PROXY_KEY` - 管理面板认证密钥
+- `ADMIN_KEY` - 管理面板认证密钥（向后兼容 PROXY_KEY）
 
 **可选环境变量：**
 - `PORT` - 监听端口（默认：`4000`）
@@ -93,6 +94,7 @@ docker run -d \
 - `SENSITIVE_WORDS_MAX_ENTRIES` - 敏感词最大数量（默认：`20000`）
 - `TEST_REQUEST_TIMEOUT` - 凭证测试超时毫秒数（默认：`15000`）
 - `CREDENTIAL_STORE_PATH` - 凭证存储路径（默认：`./data/credentials.json`）
+- `APIKEY_STORE_PATH` - API Key 存储路径（默认：`./data/apikeys.json`）
 - `SENSITIVE_WORDS_PATH` - 敏感词存储路径（默认：`./data/sensitive-words.json`）
 - `CLI_VERSION` - 伪装 CLI 版本头（默认：`2.1.31`）
 - `SDK_VERSION` - 伪装 SDK 版本头（默认：`0.72.1`）
@@ -135,7 +137,7 @@ docker run -d \
 PORT=4000                              # 代理监听端口
 TARGET_URL=https://api.example.com     # 上游 API 基础 URL（不含 /v1/...）
 API_KEY=your-upstream-api-key          # 上游 API 密钥
-PROXY_KEY=your-custom-key              # 客户端认证密钥
+ADMIN_KEY=your-admin-key              # 管理面板认证密钥
 REQUEST_TIMEOUT=60000                  # 请求超时（毫秒）
 LOG_LEVEL=info                         # 日志级别：debug, info, warn, error
 STRICT_MODE=true                       # 剥离所有用户系统消息（默认：true）
@@ -161,7 +163,7 @@ Claude Cloak 会自动注入 Claude Code 系统提示。额外的 `system` 消�
 
 ```bash
 curl -X POST https://your-domain/v1/messages \
-  -H "Authorization: Bearer YOUR_PROXY_KEY" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-sonnet-4-20250514",
@@ -174,7 +176,7 @@ curl -X POST https://your-domain/v1/messages \
 
 ```bash
 curl -X POST https://your-domain/v1/messages \
-  -H "Authorization: Bearer YOUR_PROXY_KEY" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-sonnet-4-20250514",
@@ -197,19 +199,22 @@ curl -X POST https://your-domain/v1/messages \
 ## 管理面板
 
 访问 `/admin/` 的 Web 管理面板：
-- **管理凭证**：添加、编辑、删除和切换多个上游 API 凭证
+- **管理凭证**：添加、编辑、启用/禁用上游 API 凭证
+- **管理 API Key**：创建、编辑和删除 API Key，绑定上游凭证
 - **测试连接**：一键验证上游 API 连通性（显示延迟）
 - **切换严格模式**：运行时启用/禁用系统消息剥离
 - **监控状态**：查看代理健康状态和版本
 
-> **安全提示**：管理 API 端点需要使用 `PROXY_KEY` 认证。
+> **安全提示**：管理面板使用 `ADMIN_KEY` 认证。代理端点（`/v1/messages`、`/v1/models`）使用管理面板中创建的 API Key。
 
 ## 认证方式
 
 支持两种认证方式（按顺序检查）：
 
-1. **x-api-key 头部**：`x-api-key: YOUR_PROXY_KEY`
-2. **Bearer 令牌**：`Authorization: Bearer YOUR_PROXY_KEY`
+1. **x-api-key 头部**：`x-api-key: YOUR_API_KEY`
+2. **Bearer 令牌**：`Authorization: Bearer YOUR_API_KEY`
+
+> **注意**：管理端点使用 `ADMIN_KEY`，代理端点使用管理面板中创建的 API Key。
 
 ## 工作原理
 
@@ -258,6 +263,16 @@ claude-cloak/
 │   │   ├── manager.ts      # 凭证 CRUD 操作
 │   │   ├── storage.ts      # JSON 文件持久化
 │   │   └── types.ts        # 凭证类型
+│   ├── apikeys/
+│   │   ├── manager.ts      # API Key CRUD 和解析
+│   │   ├── storage.ts      # JSON 文件持久化
+│   │   └── types.ts        # API Key 类型
+│   ├── sensitive-words/
+│   │   ├── manager.ts      # 敏感词管理
+│   │   ├── storage.ts      # JSON 文件持久化
+│   │   └── types.ts        # 敏感词类型
+│   ├── utils/
+│   │   └── mutex.ts        # 共享异步互斥锁
 │   └── settings/
 │       └── manager.ts      # 运行时设置（严格模式）
 ├── public/                 # 管理面板前端
@@ -317,7 +332,7 @@ docker compose -f docker-compose.dev.yml up -d --build
 ```bash
 docker build -f Dockerfile.node -t claude-cloak:node .
 docker run -d --name claude-cloak -p 4000:4000 \
-  -e PROXY_KEY=your-secret \
+  -e ADMIN_KEY=your-secret \
   -v ./data:/app/data \
   claude-cloak:node
 ```

@@ -28,7 +28,8 @@
 - **System Prompt Injection**: Automatically injects Claude Code identity
 - **Stealth Headers**: Mimics authentic Claude CLI request headers
 - **SSE Streaming**: Full support for streaming responses with backpressure handling
-- **Multi-Credential Management**: Store multiple upstream API credentials, switch at runtime
+- **Multi-Credential Management**: Store multiple upstream API credentials with enable/disable toggle
+- **Multi API Key**: Distribute unique API keys to users, each bound to an upstream credential
 - **Strict Mode**: Strip all user system messages, keep only Claude Code prompt
 - **Sensitive Word Obfuscation**: Aho-Corasick single-pass scanning for configurable sensitive word obfuscation
 - **Parameter Normalization**: Strip unsupported parameters (top_p) to prevent upstream errors
@@ -64,7 +65,7 @@ docker run -d \
   -p 4000:4000 \
   -e TARGET_URL=https://api.anthropic.com \
   -e API_KEY=sk-ant-xxx \
-  -e PROXY_KEY=your-secret \
+  -e ADMIN_KEY=your-secret \
   -v ./data:/app/data \
   ghcr.io/waylon256yhw/claude-cloak:latest
 ```
@@ -82,7 +83,7 @@ For Zeabur, ClawCloud, Railway, and similar platforms:
 **Required Environment Variables:**
 - `TARGET_URL` - Upstream API base URL (e.g., `https://api.anthropic.com`)
 - `API_KEY` - Upstream API credential
-- `PROXY_KEY` - Admin panel authentication key
+- `ADMIN_KEY` - Admin panel authentication key (backward-compatible with PROXY_KEY)
 
 **Optional Environment Variables:**
 - `PORT` - Listen port (default: `4000`)
@@ -93,7 +94,9 @@ For Zeabur, ClawCloud, Railway, and similar platforms:
 - `SENSITIVE_WORDS_MAX_ENTRIES` - Max sensitive word entries (default: `20000`)
 - `TEST_REQUEST_TIMEOUT` - Credential test timeout in ms (default: `15000`)
 - `CREDENTIAL_STORE_PATH` - Credential storage path (default: `./data/credentials.json`)
+- `APIKEY_STORE_PATH` - API key storage path (default: `./data/apikeys.json`)
 - `SENSITIVE_WORDS_PATH` - Sensitive words storage path (default: `./data/sensitive-words.json`)
+- `OUTBOUND_PROXY` - Outbound proxy URL for upstream requests
 - `CLI_VERSION` - Spoofed CLI version header (default: `2.1.31`)
 - `SDK_VERSION` - Spoofed SDK version header (default: `0.72.1`)
 
@@ -135,7 +138,7 @@ Any client that supports **Anthropic API format** can use this proxy:
 PORT=4000                              # Proxy listen port
 TARGET_URL=https://api.example.com     # Upstream API base URL (without /v1/...)
 API_KEY=your-upstream-api-key          # Key for upstream API
-PROXY_KEY=your-custom-key              # Key for client authentication
+ADMIN_KEY=your-admin-key              # Key for admin panel authentication
 REQUEST_TIMEOUT=60000                  # Request timeout in ms
 LOG_LEVEL=info                         # Log level: debug, info, warn, error
 STRICT_MODE=true                       # Strip all user system messages (default: true)
@@ -161,7 +164,7 @@ With Strict Mode **disabled**, user system messages are preserved but prepended 
 
 ```bash
 curl -X POST https://your-domain/v1/messages \
-  -H "Authorization: Bearer YOUR_PROXY_KEY" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-sonnet-4-20250514",
@@ -174,7 +177,7 @@ curl -X POST https://your-domain/v1/messages \
 
 ```bash
 curl -X POST https://your-domain/v1/messages \
-  -H "Authorization: Bearer YOUR_PROXY_KEY" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-sonnet-4-20250514",
@@ -197,19 +200,22 @@ curl -X POST https://your-domain/v1/messages \
 ## Admin Panel
 
 Access the web-based admin panel at `/admin/` to:
-- **Manage Credentials**: Add, edit, delete, and switch between multiple upstream API credentials
+- **Manage Credentials**: Add, edit, enable/disable upstream API credentials
+- **Manage API Keys**: Create, edit, and delete API keys with credential binding
 - **Test Connection**: Verify upstream API connectivity with one click (shows latency)
 - **Toggle Strict Mode**: Enable/disable system message stripping at runtime
 - **Monitor Status**: View proxy health status and version
 
-> **Security**: Admin API endpoints require authentication using `PROXY_KEY`.
+> **Security**: Admin panel requires `ADMIN_KEY`. Proxy endpoints (`/v1/messages`, `/v1/models`) require an API key created in the admin panel.
 
 ## Authentication
 
 Supports two authentication methods (checked in order):
 
-1. **x-api-key header**: `x-api-key: YOUR_PROXY_KEY`
-2. **Bearer token**: `Authorization: Bearer YOUR_PROXY_KEY`
+1. **x-api-key header**: `x-api-key: YOUR_API_KEY`
+2. **Bearer token**: `Authorization: Bearer YOUR_API_KEY`
+
+> **Note**: Admin endpoints use `ADMIN_KEY`, proxy endpoints use API keys managed in the admin panel.
 
 ## How It Works
 
@@ -258,6 +264,12 @@ claude-cloak/
 │   │   ├── manager.ts      # Credential CRUD operations
 │   │   ├── storage.ts      # JSON file persistence
 │   │   └── types.ts        # Credential types
+│   ├── apikeys/
+│   │   ├── manager.ts      # API key CRUD and resolution
+│   │   ├── storage.ts      # JSON file persistence
+│   │   └── types.ts        # API key types
+│   ├── utils/
+│   │   └── mutex.ts        # Shared async mutex
 │   ├── sensitive-words/
 │   │   ├── manager.ts      # Sensitive words CRUD and matching
 │   │   ├── storage.ts      # JSON file persistence
@@ -329,7 +341,7 @@ If you encounter streaming issues with Bun, use the Node.js image:
 ```bash
 docker build -f Dockerfile.node -t claude-cloak:node .
 docker run -d --name claude-cloak -p 4000:4000 \
-  -e PROXY_KEY=your-secret \
+  -e ADMIN_KEY=your-secret \
   -v ./data:/app/data \
   claude-cloak:node
 ```
