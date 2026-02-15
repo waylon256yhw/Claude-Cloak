@@ -570,6 +570,8 @@ input:focus {
     font-family: var(--font-mono);
     font-size: 0.85rem;
     max-width: 280px;
+    min-width: 0;
+    text-overflow: ellipsis;
 }
 .form-select:focus {
     border-color: var(--accent-primary);
@@ -813,6 +815,8 @@ input:focus {
     .guide-grid { grid-template-columns: 1fr; }
     .code-pre { font-size: 0.75rem; }
     .modal-content { margin: 1rem; max-width: calc(100% - 2rem); }
+    .setting-row { flex-direction: column; gap: 0.75rem; align-items: stretch; }
+    .setting-row .form-select { max-width: none; width: 100%; }
 }
 
 @media (max-width: 480px) {
