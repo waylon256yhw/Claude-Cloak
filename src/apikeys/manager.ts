@@ -2,6 +2,7 @@ import { randomUUID, randomBytes, timingSafeEqual } from 'node:crypto'
 import { ApiKeyStorage } from './storage.js'
 import type { ApiKey, ApiKeyStore, CreateApiKeyInput, UpdateApiKeyInput } from './types.js'
 import { Mutex } from '../utils/mutex.js'
+import { NotFoundError } from '../utils/errors.js'
 
 const KEY_PREFIX = 'cck-'
 const KEY_RANDOM_BYTES = 16
@@ -20,7 +21,7 @@ export class ApiKeyManager {
   }
 
   async init(): Promise<void> {
-    this.store = await this.storage.read()
+    this.store = (await this.storage.read()) ?? { keys: [] }
   }
 
   getAll(): ApiKey[] {
@@ -71,7 +72,7 @@ export class ApiKeyManager {
     await this.mutex.acquire()
     try {
       const idx = this.store.keys.findIndex((k) => k.id === id)
-      if (idx === -1) throw new Error('API key not found')
+      if (idx === -1) throw new NotFoundError('API key not found')
       const existing = this.store.keys[idx]
       const updated: ApiKey = {
         ...existing,
@@ -91,7 +92,7 @@ export class ApiKeyManager {
     await this.mutex.acquire()
     try {
       const idx = this.store.keys.findIndex((k) => k.id === id)
-      if (idx === -1) throw new Error('API key not found')
+      if (idx === -1) throw new NotFoundError('API key not found')
       this.store.keys.splice(idx, 1)
       await this.storage.write(this.store)
     } finally {

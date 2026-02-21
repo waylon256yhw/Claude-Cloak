@@ -1,5 +1,7 @@
 import { ModelStorage } from './storage.js'
 import type { ModelEntry, ModelStore } from './types.js'
+import { Mutex } from '../utils/mutex.js'
+import { NotFoundError, InvalidInputError } from '../utils/errors.js'
 
 const DEFAULT_MODELS: ModelEntry[] = [
   { id: 'claude-opus-4-6', created: 1738713600 },
@@ -15,28 +17,6 @@ const DEFAULT_MODELS: ModelEntry[] = [
 ]
 
 const DEFAULT_TEST_MODEL_ID = 'claude-haiku-4-5-20251001'
-
-class Mutex {
-  private locked = false
-  private queue: (() => void)[] = []
-
-  async acquire(): Promise<void> {
-    if (!this.locked) {
-      this.locked = true
-      return
-    }
-    await new Promise<void>((resolve) => this.queue.push(resolve))
-  }
-
-  release(): void {
-    const next = this.queue.shift()
-    if (next) {
-      next()
-    } else {
-      this.locked = false
-    }
-  }
-}
 
 export class ModelManager {
   private store: ModelStore = { entries: [], testModelId: DEFAULT_TEST_MODEL_ID, updatedAt: '' }
@@ -77,7 +57,7 @@ export class ModelManager {
     await this.mutex.acquire()
     try {
       if (this.store.entries.some(e => e.id === id)) {
-        throw new Error('Model already exists')
+        throw new InvalidInputError('Model already exists')
       }
       const entry: ModelEntry = { id, created: created ?? Math.floor(Date.now() / 1000) }
       this.store.entries.push(entry)
@@ -93,7 +73,7 @@ export class ModelManager {
     await this.mutex.acquire()
     try {
       const idx = this.store.entries.findIndex(e => e.id === id)
-      if (idx === -1) throw new Error('Model not found')
+      if (idx === -1) throw new NotFoundError('Model not found')
       this.store.entries.splice(idx, 1)
       this.store.updatedAt = new Date().toISOString()
       await this.storage.write(this.store)

@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
+import { NotFoundError, InvalidInputError } from '../utils/errors.js'
 import type { Config } from '../types.js'
 import { credentialManager } from '../credentials/manager.js'
 import type { CreateCredentialInput, UpdateCredentialInput } from '../credentials/types.js'
@@ -23,13 +24,12 @@ function looksLikeMaskedKey(key: string): boolean {
 }
 
 function handleCrudError(reply: FastifyReply, err: unknown): void {
-  const msg = err instanceof Error ? err.message : String(err)
-  const lower = msg.toLowerCase()
-  if (lower.includes('not found')) {
-    reply.code(404).send({ error: 'Not Found', message: msg })
-  } else if (lower.includes('invalid')) {
-    reply.code(400).send({ error: 'Bad Request', message: msg })
+  if (err instanceof NotFoundError) {
+    reply.code(404).send({ error: 'Not Found', message: err.message })
+  } else if (err instanceof InvalidInputError) {
+    reply.code(400).send({ error: 'Bad Request', message: err.message })
   } else {
+    const msg = err instanceof Error ? err.message : String(err)
     reply.code(500).send({ error: 'Internal Server Error', message: msg })
   }
 }
@@ -237,9 +237,9 @@ async function registerSettingsRoutes(fastify: FastifyInstance): Promise<void> {
       return
     }
     try {
-      return settingsManager.update(request.body || {})
+      return await settingsManager.update(request.body || {})
     } catch (err) {
-      reply.code(400).send({ error: 'Bad Request', message: (err as Error).message })
+      handleCrudError(reply, err)
     }
   })
 }

@@ -302,6 +302,7 @@ bun run build
 bun start
 
 # 备选：使用 Node.js
+# 注意：出口代理（OUTBOUND_PROXY）在 Node.js 下不可用
 npm install
 npm run build
 npm run start:node

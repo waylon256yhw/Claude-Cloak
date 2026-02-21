@@ -1,13 +1,15 @@
+import { InvalidInputError } from '../utils/errors.js'
+
 export function validateProxyUrl(raw: string): string {
   const trimmed = raw.trim()
   let url: URL
   try {
     url = new URL(trimmed)
   } catch {
-    throw new Error('Invalid proxy URL: malformed URL')
+    throw new InvalidInputError('Invalid proxy URL: malformed URL')
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error(`Invalid proxy URL: only http/https supported, got ${url.protocol.replace(':', '')}`)
+    throw new InvalidInputError(`Invalid proxy URL: only http/https supported, got ${url.protocol.replace(':', '')}`)
   }
   return trimmed
 }

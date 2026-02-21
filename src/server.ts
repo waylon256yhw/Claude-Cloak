@@ -10,6 +10,7 @@ import { adminRoutes } from './routes/admin.js'
 import { credentialManager } from './credentials/manager.js'
 import { apiKeyManager } from './apikeys/manager.js'
 import { modelManager } from './models/manager.js'
+import { settingsManager } from './settings/manager.js'
 
 const MAX_BODY_SIZE = 20 * 1024 * 1024
 
@@ -18,6 +19,7 @@ const config = loadConfig()
 await credentialManager.init()
 await apiKeyManager.init()
 await modelManager.init()
+await settingsManager.init()
 
 const fastify = Fastify({
   logger: {

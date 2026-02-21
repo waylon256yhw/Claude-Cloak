@@ -1,15 +1,8 @@
-import { promises as fs } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { join } from 'node:path'
+import { JsonStore } from '../utils/json-store.js'
 import type { SensitiveWordsStore, SensitiveWordEntry } from './types.js'
 
 const DEFAULT_PATH = join(process.cwd(), 'data', 'sensitive-words.json')
-
-const DEFAULT_STORE: SensitiveWordsStore = {
-  version: 1,
-  enabled: true,
-  updatedAt: Date.now(),
-  entries: [],
-}
 
 function isValidEntry(e: unknown): e is SensitiveWordEntry {
   if (!e || typeof e !== 'object') return false
@@ -33,50 +26,20 @@ function sanitizeEntries(raw: unknown[]): SensitiveWordEntry[] {
   return valid
 }
 
-export class SensitiveWordsStorage {
-  private path: string
-
+export class SensitiveWordsStorage extends JsonStore<SensitiveWordsStore> {
   constructor(path?: string) {
-    this.path = path || process.env.SENSITIVE_WORDS_PATH || DEFAULT_PATH
+    super(path || process.env.SENSITIVE_WORDS_PATH || DEFAULT_PATH, {
+      tmpPrefix: '.sw-',
+    })
   }
 
-  async read(): Promise<SensitiveWordsStore> {
-    try {
-      const data = await fs.readFile(this.path, 'utf8')
-      const parsed = JSON.parse(data)
-      if (!parsed || typeof parsed !== 'object') {
-        return { ...DEFAULT_STORE }
-      }
-      const rawEntries = Array.isArray(parsed.entries) ? parsed.entries : []
-      return {
-        version: 1,
-        enabled: parsed.enabled !== false,
-        updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Date.now(),
-        entries: sanitizeEntries(rawEntries),
-      }
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code
-      if (code === 'ENOENT') {
-        return { ...DEFAULT_STORE }
-      }
-      console.error('Failed to read sensitive words store:', err)
-      return { ...DEFAULT_STORE }
-    }
-  }
-
-  async write(store: SensitiveWordsStore): Promise<void> {
-    const dir = dirname(this.path)
-    await fs.mkdir(dir, { recursive: true })
-    const tmp = join(dir, `.sw-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`)
-    const payload = JSON.stringify(store, null, 2)
-    try {
-      await fs.writeFile(tmp, payload, { mode: 0o644 })
-      await fs.rename(tmp, this.path)
-    } catch (err) {
-      try {
-        await fs.unlink(tmp)
-      } catch {}
-      throw err
+  protected deserialize(raw: Record<string, unknown>): SensitiveWordsStore {
+    const rawEntries = Array.isArray(raw.entries) ? raw.entries : []
+    return {
+      version: 1,
+      enabled: raw.enabled !== false,
+      updatedAt: typeof raw.updatedAt === 'number' ? (raw.updatedAt as number) : Date.now(),
+      entries: sanitizeEntries(rawEntries),
     }
   }
 }

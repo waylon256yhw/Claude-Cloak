@@ -3,6 +3,7 @@ import { CredentialStorage } from './storage.js'
 import type { Credential, CredentialStore, CreateCredentialInput, UpdateCredentialInput } from './types.js'
 import { validateProxyUrl } from '../services/proxy-fetch.js'
 import { Mutex } from '../utils/mutex.js'
+import { NotFoundError, InvalidInputError } from '../utils/errors.js'
 
 function validateTargetUrl(raw: string): string {
   const trimmed = raw.trim()
@@ -10,10 +11,10 @@ function validateTargetUrl(raw: string): string {
   try {
     url = new URL(trimmed)
   } catch {
-    throw new Error('Invalid targetUrl: malformed URL')
+    throw new InvalidInputError('Invalid targetUrl: malformed URL')
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new Error('Invalid targetUrl: only http/https allowed')
+    throw new InvalidInputError('Invalid targetUrl: only http/https allowed')
   }
   return url.origin + url.pathname.replace(/\/+$/, '')
 }
@@ -28,7 +29,7 @@ export class CredentialManager {
   }
 
   async init(): Promise<void> {
-    this.store = await this.storage.read()
+    this.store = (await this.storage.read()) ?? { credentials: [] }
   }
 
   getAll(): Credential[] {
@@ -65,7 +66,7 @@ export class CredentialManager {
     await this.mutex.acquire()
     try {
       const idx = this.store.credentials.findIndex((c) => c.id === id)
-      if (idx === -1) throw new Error('Credential not found')
+      if (idx === -1) throw new NotFoundError('Credential not found')
       const existing = this.store.credentials[idx]
       const updated: Credential = {
         ...existing,
@@ -89,7 +90,7 @@ export class CredentialManager {
     await this.mutex.acquire()
     try {
       const idx = this.store.credentials.findIndex((c) => c.id === id)
-      if (idx === -1) throw new Error('Credential not found')
+      if (idx === -1) throw new NotFoundError('Credential not found')
       this.store.credentials.splice(idx, 1)
       await this.storage.write(this.store)
     } finally {
@@ -101,7 +102,7 @@ export class CredentialManager {
     await this.mutex.acquire()
     try {
       const cred = this.store.credentials.find((c) => c.id === id)
-      if (!cred) throw new Error('Credential not found')
+      if (!cred) throw new NotFoundError('Credential not found')
       cred.enabled = enabled
       cred.updatedAt = new Date().toISOString()
       await this.storage.write(this.store)

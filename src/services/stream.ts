@@ -19,7 +19,6 @@ export async function pipeStream(
   })
 
   const reader = (response.body as ReadableStream<Uint8Array>).getReader()
-  const decoder = new TextDecoder()
 
   // Idle timeout: reset on each chunk, abort if no data for too long
   let timeoutId: NodeJS.Timeout | undefined
@@ -40,14 +39,11 @@ export async function pipeStream(
       if (result.done) break
 
       if (result.value) {
-        const chunk = decoder.decode(result.value, { stream: true })
-
-        // Check if response is still writable before writing
         if (reply.raw.destroyed || reply.raw.writableEnded) {
           break
         }
 
-        const canContinue = reply.raw.write(chunk)
+        const canContinue = reply.raw.write(result.value)
 
         // Reset idle timeout after successful chunk write
         resetIdleTimeout()

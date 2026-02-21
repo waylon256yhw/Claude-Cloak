@@ -305,6 +305,7 @@ bun run build
 bun start
 
 # Alternative: Use Node.js
+# Note: Outbound proxy (OUTBOUND_PROXY) is not available under Node.js
 npm install
 npm run build
 npm run start:node
