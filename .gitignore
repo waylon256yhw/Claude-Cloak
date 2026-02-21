@@ -30,6 +30,7 @@ data/
 
 # Working documents
 CLAUDE.md
+docs/
 
 # MCP tools
 .serena/

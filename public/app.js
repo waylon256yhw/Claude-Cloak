@@ -1066,7 +1066,7 @@ function openApiKeyModal(existing = null) {
     document.getElementById('apiKeyName').value = existing ? existing.name : '';
     populateCredentialSelect(existing?.credentialId);
     document.getElementById('apiKeyModal').classList.remove('hidden');
-    document.getElementById('apiKeyName').focus();
+    document.getElementById(isEdit ? 'apiKeyCredential' : 'apiKeyName').focus();
 }
 
 function closeApiKeyModal() {
