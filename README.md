@@ -31,7 +31,7 @@
 - **Multi-Credential Management**: Store multiple upstream API credentials with enable/disable toggle
 - **Multi API Key**: Distribute unique API keys to users, each bound to an upstream credential
 - **Strict Mode**: Strip all user system messages, keep only Claude Code prompt
-- **Sensitive Word Obfuscation**: Aho-Corasick single-pass scanning for configurable sensitive word obfuscation
+- **Per-Credential Word Sets**: Bind word sets to individual credentials for per-channel sensitive word obfuscation (Aho-Corasick)
 - **Parameter Normalization**: Strip unsupported parameters (top_p) to prevent upstream errors
 - **Admin Panel**: Web UI with version display, credential management, connection testing, and settings
 - **Docker Ready**: Production and development Docker Compose configurations
@@ -202,6 +202,7 @@ curl -X POST https://your-domain/v1/messages \
 Access the web-based admin panel at `/admin/` to:
 - **Manage Credentials**: Add, edit, enable/disable upstream API credentials
 - **Manage API Keys**: Create, edit, and delete API keys with credential binding
+- **Manage Word Sets**: Create categorized word sets and bind them to credentials for per-channel obfuscation
 - **Test Connection**: Verify upstream API connectivity with one click (shows latency)
 - **Toggle Strict Mode**: Enable/disable system message stripping at runtime
 - **Monitor Status**: View proxy health status and version
@@ -271,9 +272,9 @@ claude-cloak/
 │   ├── utils/
 │   │   └── mutex.ts        # Shared async mutex
 │   ├── sensitive-words/
-│   │   ├── manager.ts      # Sensitive words CRUD and matching
-│   │   ├── storage.ts      # JSON file persistence
-│   │   ├── types.ts        # Word entry types
+│   │   ├── manager.ts      # Word set CRUD, per-set words, merged matcher cache
+│   │   ├── storage.ts      # JSON file persistence (v1→v2 migration)
+│   │   ├── types.ts        # Word set and entry types
 │   │   └── grapheme.ts     # Unicode grapheme utilities
 │   └── settings/
 │       └── manager.ts      # Runtime settings (Strict Mode)

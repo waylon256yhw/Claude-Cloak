@@ -31,7 +31,7 @@
 - **多凭证管理**：存储多个上游 API 凭证，支持启用/禁用切换
 - **多 API Key**：为用户分发独立的 API Key，每个 Key 绑定一个上游凭证
 - **严格模式**：剥离所有用户系统消息，仅保留 Claude Code 提示
-- **敏感词混淆**：Aho-Corasick 单次扫描，自动混淆可配置的敏感词
+- **按渠道词集绑定**：将词集绑定到独立凭证，实现按渠道敏感词混淆（Aho-Corasick）
 - **参数规范化**：剥离不支持的参数（top_p）防止上游错误
 - **管理面板**：Web UI 管理凭证、测试连接和设置（需要认证）
 - **Docker 就绪**：一键 Docker Compose 部署
@@ -201,6 +201,7 @@ curl -X POST https://your-domain/v1/messages \
 访问 `/admin/` 的 Web 管理面板：
 - **管理凭证**：添加、编辑、启用/禁用上游 API 凭证
 - **管理 API Key**：创建、编辑和删除 API Key，绑定上游凭证
+- **管理词集**：创建分类词集并绑定到凭证，实现按渠道混淆控制
 - **测试连接**：一键验证上游 API 连通性（显示延迟）
 - **切换严格模式**：运行时启用/禁用系统消息剥离
 - **监控状态**：查看代理健康状态和版本
@@ -268,9 +269,10 @@ claude-cloak/
 │   │   ├── storage.ts      # JSON 文件持久化
 │   │   └── types.ts        # API Key 类型
 │   ├── sensitive-words/
-│   │   ├── manager.ts      # 敏感词管理
-│   │   ├── storage.ts      # JSON 文件持久化
-│   │   └── types.ts        # 敏感词类型
+│   │   ├── manager.ts      # 词集 CRUD、按 set 管理词条、合并 matcher 缓存
+│   │   ├── storage.ts      # JSON 文件持久化（v1→v2 迁移）
+│   │   ├── types.ts        # 词集与词条类型
+│   │   └── grapheme.ts     # Unicode 字素工具
 │   ├── utils/
 │   │   └── mutex.ts        # 共享异步互斥锁
 │   └── settings/
