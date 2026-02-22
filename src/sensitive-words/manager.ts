@@ -205,7 +205,8 @@ class SensitiveWordsManager {
 
   // --- Word CRUD (scoped to a set) ---
 
-  private validateWord(word: string): string | null {
+  private validateWord(word: unknown): string | null {
+    if (typeof word !== 'string') return null
     const trimmed = word.trim()
     if (trimmed.length > MAX_WORD_LENGTH) return null
     if (containsZW(trimmed)) return null
@@ -257,7 +258,7 @@ class SensitiveWordsManager {
     }
   }
 
-  async addWordBatch(setId: string, words: string[]): Promise<{ added: number; skipped: number } | null> {
+  async addWordBatch(setId: string, words: unknown[]): Promise<{ added: number; skipped: number } | null> {
     await this.mutex.acquire()
     try {
       await this.ensureLoaded()

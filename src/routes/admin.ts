@@ -115,8 +115,16 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
       reply.code(400).send({ error: 'Bad Request', message: 'wordSetIds must be an array of strings' })
       return
     }
+    const unique = [...new Set(wordSetIds)]
+    const allSets = await sensitiveWordsManager.getAllSets()
+    const validIds = new Set(allSets.map((s) => s.id))
+    const invalid = unique.filter((id) => !validIds.has(id))
+    if (invalid.length) {
+      reply.code(400).send({ error: 'Bad Request', message: `Unknown word set IDs: ${invalid.join(', ')}` })
+      return
+    }
     try {
-      const cred = await credentialManager.setWordSetIds(request.params.id, wordSetIds)
+      const cred = await credentialManager.setWordSetIds(request.params.id, unique)
       return maskCredential(cred)
     } catch (err) {
       handleCrudError(reply, err)
@@ -276,6 +284,22 @@ async function registerWordSetRoutes(fastify: FastifyInstance): Promise<void> {
     }))
   })
 
+  fastify.get<{ Params: IdParams }>('/word-sets/:id', async (request, reply) => {
+    const set = await sensitiveWordsManager.getSetById(request.params.id)
+    if (!set) {
+      reply.code(404).send({ error: 'Not Found', message: 'Word set not found' })
+      return
+    }
+    const allCreds = credentialManager.getAll()
+    return {
+      id: set.id,
+      name: set.name,
+      entryCount: set.entries.length,
+      credentialCount: allCreds.filter((c) => c.wordSetIds.includes(set.id)).length,
+      updatedAt: set.updatedAt,
+    }
+  })
+
   fastify.post<{ Body: { name: string } }>('/word-sets', async (request, reply) => {
     const { name } = request.body || {}
     if (!name || typeof name !== 'string' || !name.trim()) {
@@ -335,8 +359,8 @@ async function registerWordSetRoutes(fastify: FastifyInstance): Promise<void> {
 
   fastify.post<{ Params: IdParams; Body: { words: string[] } }>('/word-sets/:id/words/batch', async (request, reply) => {
     const { words } = request.body || {}
-    if (!Array.isArray(words)) {
-      reply.code(400).send({ error: 'Bad Request', message: 'words must be an array' })
+    if (!Array.isArray(words) || !words.every((w: unknown) => typeof w === 'string')) {
+      reply.code(400).send({ error: 'Bad Request', message: 'words must be an array of strings' })
       return
     }
     const result = await sensitiveWordsManager.addWordBatch(request.params.id, words)
