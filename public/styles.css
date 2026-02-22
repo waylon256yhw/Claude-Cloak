@@ -223,15 +223,25 @@ h1, h2, h3 {
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .card {
+    position: relative;
     background: var(--bg-panel);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-card);
     padding: 1.5rem;
     box-shadow: var(--shadow-card);
-    transition: all 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
+}
+
+.card::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -6px;
+    height: 6px;
 }
 
 .card:hover {

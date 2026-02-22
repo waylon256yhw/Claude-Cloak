@@ -852,10 +852,8 @@ document.getElementById('wordSetList')?.addEventListener('click', (e) => {
     }
 });
 
-// Search input delegation
-document.getElementById('wordSetList')?.addEventListener('input', (e) => {
-    const searchInput = e.target.closest('[data-ws-search]');
-    if (!searchInput) return;
+// Search input delegation (skip during IME composition)
+function handleWordSetSearch(searchInput) {
     const wsId = searchInput.dataset.wsSearch;
     clearTimeout(wordsSearchTimers[wsId]);
     wordsSearchTimers[wsId] = setTimeout(() => {
@@ -863,6 +861,18 @@ document.getElementById('wordSetList')?.addEventListener('input', (e) => {
         wordsDisplayLimits[wsId] = WORDS_PAGE_SIZE;
         refreshWordSetContent(wsId);
     }, 200);
+}
+
+document.getElementById('wordSetList')?.addEventListener('input', (e) => {
+    const searchInput = e.target.closest('[data-ws-search]');
+    if (!searchInput || e.isComposing) return;
+    handleWordSetSearch(searchInput);
+});
+
+document.getElementById('wordSetList')?.addEventListener('compositionend', (e) => {
+    const searchInput = e.target.closest('[data-ws-search]');
+    if (!searchInput) return;
+    handleWordSetSearch(searchInput);
 });
 
 // Create word set
