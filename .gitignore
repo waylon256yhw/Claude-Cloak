@@ -34,3 +34,6 @@ docs/
 
 # MCP tools
 .serena/
+
+# Scripts
+scripts/
