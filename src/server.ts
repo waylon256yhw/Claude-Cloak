@@ -23,7 +23,7 @@ await modelManager.init()
 await settingsManager.init()
 
 // Trigger sensitive words load (and possible v1→v2 migration)
-await sensitiveWordsManager.getAllSets()
+const allSets = await sensitiveWordsManager.getAllSets()
 const migration = sensitiveWordsManager.getMigrationInfo()
 if (migration.migrated && migration.wasEnabled && migration.defaultSetId) {
   const allCreds = credentialManager.getAll()
@@ -33,6 +33,18 @@ if (migration.migrated && migration.wasEnabled && migration.defaultSetId) {
     }
   }
   console.log(`Migrated sensitive words v1→v2: assigned default set to ${allCreds.length} credential(s)`)
+}
+
+// Clean up stale word set references from credentials
+if (allSets.length > 0) {
+  const validSetIds = new Set(allSets.map((s) => s.id))
+  for (const cred of credentialManager.getAll()) {
+    const staleCount = cred.wordSetIds.filter((id) => !validSetIds.has(id)).length
+    if (staleCount > 0) {
+      await credentialManager.setWordSetIds(cred.id, cred.wordSetIds.filter((id) => validSetIds.has(id)))
+      console.log(`Cleaned ${staleCount} stale word set ref(s) from credential "${cred.name}"`)
+    }
+  }
 }
 
 const fastify = Fastify({

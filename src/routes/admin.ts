@@ -118,13 +118,9 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
     const unique = [...new Set(wordSetIds)]
     const allSets = await sensitiveWordsManager.getAllSets()
     const validIds = new Set(allSets.map((s) => s.id))
-    const invalid = unique.filter((id) => !validIds.has(id))
-    if (invalid.length) {
-      reply.code(400).send({ error: 'Bad Request', message: `Unknown word set IDs: ${invalid.join(', ')}` })
-      return
-    }
+    const filtered = unique.filter((id) => validIds.has(id))
     try {
-      const cred = await credentialManager.setWordSetIds(request.params.id, unique)
+      const cred = await credentialManager.setWordSetIds(request.params.id, filtered)
       return maskCredential(cred)
     } catch (err) {
       handleCrudError(reply, err)
