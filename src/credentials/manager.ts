@@ -50,6 +50,7 @@ export class CredentialManager {
         targetUrl: validateTargetUrl(input.targetUrl),
         apiKey: input.apiKey,
         proxyUrl: input.proxyUrl ? validateProxyUrl(input.proxyUrl) : null,
+        wordSetIds: [],
         enabled: true,
         createdAt: now,
         updatedAt: now,
@@ -93,6 +94,38 @@ export class CredentialManager {
       if (idx === -1) throw new NotFoundError('Credential not found')
       this.store.credentials.splice(idx, 1)
       await this.storage.write(this.store)
+    } finally {
+      this.mutex.release()
+    }
+  }
+
+  async setWordSetIds(id: string, wordSetIds: string[]): Promise<Credential> {
+    await this.mutex.acquire()
+    try {
+      const cred = this.store.credentials.find((c) => c.id === id)
+      if (!cred) throw new NotFoundError('Credential not found')
+      cred.wordSetIds = wordSetIds
+      cred.updatedAt = new Date().toISOString()
+      await this.storage.write(this.store)
+      return cred
+    } finally {
+      this.mutex.release()
+    }
+  }
+
+  async unbindWordSet(setId: string): Promise<void> {
+    await this.mutex.acquire()
+    try {
+      let changed = false
+      for (const cred of this.store.credentials) {
+        const idx = cred.wordSetIds.indexOf(setId)
+        if (idx !== -1) {
+          cred.wordSetIds.splice(idx, 1)
+          cred.updatedAt = new Date().toISOString()
+          changed = true
+        }
+      }
+      if (changed) await this.storage.write(this.store)
     } finally {
       this.mutex.release()
     }

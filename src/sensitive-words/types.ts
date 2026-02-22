@@ -5,11 +5,23 @@ export interface SensitiveWordEntry {
   updatedAt: number
 }
 
-export interface SensitiveWordsStore {
+export interface SensitiveWordSet {
+  id: string
+  name: string
+  entries: SensitiveWordEntry[]
+  updatedAt: number
+}
+
+export interface SensitiveWordsStoreV1 {
   version: 1
   enabled: boolean
   updatedAt: number
   entries: SensitiveWordEntry[]
+}
+
+export interface SensitiveWordSetsStore {
+  version: 2
+  sets: SensitiveWordSet[]
 }
 
 export interface CompiledMatcher {

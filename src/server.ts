@@ -11,6 +11,7 @@ import { credentialManager } from './credentials/manager.js'
 import { apiKeyManager } from './apikeys/manager.js'
 import { modelManager } from './models/manager.js'
 import { settingsManager } from './settings/manager.js'
+import { sensitiveWordsManager } from './sensitive-words/manager.js'
 
 const MAX_BODY_SIZE = 20 * 1024 * 1024
 
@@ -20,6 +21,19 @@ await credentialManager.init()
 await apiKeyManager.init()
 await modelManager.init()
 await settingsManager.init()
+
+// Trigger sensitive words load (and possible v1→v2 migration)
+await sensitiveWordsManager.getAllSets()
+const migration = sensitiveWordsManager.getMigrationInfo()
+if (migration.migrated && migration.wasEnabled && migration.defaultSetId) {
+  const allCreds = credentialManager.getAll()
+  for (const cred of allCreds) {
+    if (!cred.wordSetIds.length) {
+      await credentialManager.setWordSetIds(cred.id, [migration.defaultSetId])
+    }
+  }
+  console.log(`Migrated sensitive words v1→v2: assigned default set to ${allCreds.length} credential(s)`)
+}
 
 const fastify = Fastify({
   logger: {

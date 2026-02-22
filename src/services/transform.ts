@@ -2,6 +2,7 @@ import type {
   ClaudeRequest,
   ClaudeSystemBlock,
 } from '../types.js'
+import type { Credential } from '../credentials/types.js'
 import { generateFakeUserId, isValidUserId } from './user.js'
 import { settingsManager } from '../settings/manager.js'
 import { sensitiveWordsManager } from '../sensitive-words/manager.js'
@@ -33,7 +34,7 @@ function normalizeAnthropicParams(request: ClaudeRequest, logger?: LoggerLike): 
   return normalized
 }
 
-export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: LoggerLike): Promise<ClaudeRequest> {
+export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: LoggerLike, credential?: Credential): Promise<ClaudeRequest> {
   let enhanced = { ...request }
 
   if (settingsManager.isStrictMode()) {
@@ -57,13 +58,13 @@ export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: L
     enhanced = normalizeAnthropicParams(enhanced, logger)
   }
 
-  try {
-    if (await sensitiveWordsManager.isEnabled()) {
-      const matcher = await sensitiveWordsManager.getCompiledMatcher()
+  if (credential?.wordSetIds?.length) {
+    try {
+      const matcher = sensitiveWordsManager.getMergedMatcher(credential.wordSetIds)
       enhanced = obfuscateAnthropicRequest(enhanced, matcher)
+    } catch (err) {
+      logger?.warn?.({ err }, 'Word obfuscation failed, continuing without obfuscation')
     }
-  } catch (err) {
-    logger?.warn?.({ err }, 'Word obfuscation failed, continuing without obfuscation')
   }
 
   return enhanced

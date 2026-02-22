@@ -1,20 +1,67 @@
 import { randomUUID } from 'node:crypto'
 import AhoCorasick from 'modern-ahocorasick'
-import type { SensitiveWordEntry, SensitiveWordsStore, CompiledMatcher } from './types.js'
-import { SensitiveWordsStorage } from './storage.js'
+import type { SensitiveWordEntry, SensitiveWordSet, SensitiveWordSetsStore, CompiledMatcher } from './types.js'
+import { SensitiveWordsStorage, type MigrationInfo } from './storage.js'
 import { graphemeLength, containsZW, ZW } from './grapheme.js'
 import { Mutex } from '../utils/mutex.js'
 
-const MAX_ENTRIES = Math.max(100, parseInt(process.env.SENSITIVE_WORDS_MAX_ENTRIES || '20000', 10) || 20000)
+const MAX_ENTRIES_PER_SET = Math.max(100, parseInt(process.env.SENSITIVE_WORDS_MAX_ENTRIES || '20000', 10) || 20000)
 const MAX_WORD_LENGTH = 100
+const EMPTY_MATCHER: CompiledMatcher = { zw: ZW }
+
+function buildMatcher(entries: SensitiveWordEntry[]): CompiledMatcher {
+  if (entries.length === 0) return EMPTY_MATCHER
+
+  const seen = new Set<string>()
+  const keywords: string[] = []
+  const keyGraphemeLens = new Map<string, number>()
+
+  for (const entry of entries) {
+    const normalized = entry.word.normalize('NFKC')
+    const len = graphemeLength(normalized)
+    if (len >= 2) {
+      const lower = normalized.toLowerCase()
+      if (!seen.has(lower)) {
+        seen.add(lower)
+        keywords.push(lower)
+        keyGraphemeLens.set(lower, len)
+      }
+    }
+  }
+
+  if (keywords.length === 0) return EMPTY_MATCHER
+  return { ac: new AhoCorasick(keywords), keyGraphemeLens, zw: ZW }
+}
+
+function mergeMatchers(matchers: CompiledMatcher[]): CompiledMatcher {
+  const allKeywords: string[] = []
+  const mergedLens = new Map<string, number>()
+  const seen = new Set<string>()
+
+  for (const m of matchers) {
+    if (!m.ac || !m.keyGraphemeLens) continue
+    for (const [key, len] of m.keyGraphemeLens) {
+      if (!seen.has(key)) {
+        seen.add(key)
+        allKeywords.push(key)
+        mergedLens.set(key, len)
+      }
+    }
+  }
+
+  if (allKeywords.length === 0) return EMPTY_MATCHER
+  return { ac: new AhoCorasick(allKeywords), keyGraphemeLens: mergedLens, zw: ZW }
+}
 
 class SensitiveWordsManager {
   private storage = new SensitiveWordsStorage()
-  private store: SensitiveWordsStore | null = null
-  private matcher: CompiledMatcher | null = null
+  private store: SensitiveWordSetsStore | null = null
   private initPromise: Promise<void> | null = null
-  private wordIndex: Map<string, string> = new Map()
   private mutex = new Mutex()
+
+  private setMatcherCache = new Map<string, CompiledMatcher>()
+  private mergedMatcherCache = new Map<string, CompiledMatcher>()
+  private setIdToMergedKeys = new Map<string, Set<string>>()
 
   private normalizeForIndex(word: string): string {
     return word.normalize('NFKC').toLowerCase()
@@ -29,80 +76,134 @@ class SensitiveWordsManager {
   }
 
   private async load(): Promise<void> {
-    this.store = (await this.storage.read()) ?? {
-      version: 1,
-      enabled: true,
-      updatedAt: Date.now(),
-      entries: [],
-    }
-    this.rebuildMatcher()
+    this.store = (await this.storage.read()) ?? { version: 2, sets: [] }
+  }
+
+  getMigrationInfo(): MigrationInfo {
+    return this.storage.getMigrationInfo()
   }
 
   private async save(): Promise<void> {
     if (!this.store) return
-    this.store.updatedAt = Date.now()
     await this.storage.write(this.store)
   }
 
-  private rebuildMatcher(): void {
-    this.wordIndex.clear()
+  private getSetMatcher(set: SensitiveWordSet): CompiledMatcher {
+    let cached = this.setMatcherCache.get(set.id)
+    if (cached) return cached
+    cached = buildMatcher(set.entries)
+    this.setMatcherCache.set(set.id, cached)
+    return cached
+  }
 
-    if (!this.store || this.store.entries.length === 0) {
-      this.matcher = { zw: ZW }
-      return
-    }
-
-    const seen = new Set<string>()
-    const keywords: string[] = []
-    const keyGraphemeLens = new Map<string, number>()
-
-    for (const entry of this.store.entries) {
-      const normalized = entry.word.normalize('NFKC')
-      const len = graphemeLength(normalized)
-      this.wordIndex.set(this.normalizeForIndex(entry.word), entry.id)
-      if (len >= 2) {
-        const lower = normalized.toLowerCase()
-        if (!seen.has(lower)) {
-          seen.add(lower)
-          keywords.push(lower)
-          keyGraphemeLens.set(lower, len)
-        }
+  private invalidateSet(setId: string): void {
+    this.setMatcherCache.delete(setId)
+    const mergedKeys = this.setIdToMergedKeys.get(setId)
+    if (mergedKeys) {
+      for (const key of mergedKeys) {
+        this.mergedMatcherCache.delete(key)
       }
+      this.setIdToMergedKeys.delete(setId)
     }
-
-    if (keywords.length === 0) {
-      this.matcher = { zw: ZW }
-      return
-    }
-
-    this.matcher = { ac: new AhoCorasick(keywords), keyGraphemeLens, zw: ZW }
   }
 
-  async isEnabled(): Promise<boolean> {
+  getMergedMatcher(wordSetIds: string[]): CompiledMatcher {
+    if (wordSetIds.length === 0 || !this.store) return EMPTY_MATCHER
+
+    const sorted = [...wordSetIds].sort()
+    const cacheKey = sorted.join('|')
+
+    let cached = this.mergedMatcherCache.get(cacheKey)
+    if (cached) return cached
+
+    if (sorted.length === 1) {
+      const set = this.store.sets.find((s) => s.id === sorted[0])
+      if (!set) return EMPTY_MATCHER
+      cached = this.getSetMatcher(set)
+    } else {
+      const matchers: CompiledMatcher[] = []
+      for (const id of sorted) {
+        const set = this.store.sets.find((s) => s.id === id)
+        if (set) matchers.push(this.getSetMatcher(set))
+      }
+      cached = matchers.length > 0 ? mergeMatchers(matchers) : EMPTY_MATCHER
+    }
+
+    this.mergedMatcherCache.set(cacheKey, cached)
+    for (const id of sorted) {
+      let keys = this.setIdToMergedKeys.get(id)
+      if (!keys) {
+        keys = new Set()
+        this.setIdToMergedKeys.set(id, keys)
+      }
+      keys.add(cacheKey)
+    }
+
+    return cached
+  }
+
+  // --- Word Set CRUD ---
+
+  async getAllSets(): Promise<SensitiveWordSet[]> {
     await this.ensureLoaded()
-    return this.store!.enabled
+    return this.store!.sets.map((s) => ({ ...s, entries: [...s.entries] }))
   }
 
-  async setEnabled(enabled: boolean): Promise<void> {
+  async getSetById(id: string): Promise<SensitiveWordSet | undefined> {
+    await this.ensureLoaded()
+    const set = this.store!.sets.find((s) => s.id === id)
+    return set ? { ...set, entries: [...set.entries] } : undefined
+  }
+
+  async createSet(name: string): Promise<SensitiveWordSet> {
     await this.mutex.acquire()
     try {
       await this.ensureLoaded()
-      this.store!.enabled = enabled
+      const set: SensitiveWordSet = {
+        id: randomUUID(),
+        name: name.trim(),
+        entries: [],
+        updatedAt: Date.now(),
+      }
+      this.store!.sets.push(set)
       await this.save()
+      return { ...set, entries: [] }
     } finally {
       this.mutex.release()
     }
   }
 
-  async getAll(): Promise<SensitiveWordEntry[]> {
-    await this.ensureLoaded()
-    return [...this.store!.entries]
+  async updateSet(id: string, name: string): Promise<SensitiveWordSet | null> {
+    await this.mutex.acquire()
+    try {
+      await this.ensureLoaded()
+      const set = this.store!.sets.find((s) => s.id === id)
+      if (!set) return null
+      set.name = name.trim()
+      set.updatedAt = Date.now()
+      await this.save()
+      return { ...set, entries: [...set.entries] }
+    } finally {
+      this.mutex.release()
+    }
   }
 
-  async getStore(): Promise<SensitiveWordsStore> {
-    await this.ensureLoaded()
-    return { ...this.store!, entries: [...this.store!.entries] }
+  async removeSet(id: string): Promise<boolean> {
+    await this.mutex.acquire()
+    try {
+      await this.ensureLoaded()
+      const idx = this.store!.sets.findIndex((s) => s.id === id)
+      if (idx === -1) return false
+      this.store!.sets.splice(idx, 1)
+      this.invalidateSet(id)
+      await this.save()
+      return true
+    } finally {
+      this.mutex.release()
+    }
   }
+
+  // --- Word CRUD (scoped to a set) ---
 
   private validateWord(word: string): string | null {
     const trimmed = word.trim()
@@ -113,23 +214,32 @@ class SensitiveWordsManager {
     return trimmed
   }
 
-  private isDuplicate(word: string, excludeId?: string): boolean {
+  private isDuplicateInSet(set: SensitiveWordSet, word: string, excludeId?: string): boolean {
     const normalized = this.normalizeForIndex(word)
-    const existingId = this.wordIndex.get(normalized)
-    if (!existingId) return false
-    return existingId !== excludeId
+    for (const entry of set.entries) {
+      if (entry.id === excludeId) continue
+      if (this.normalizeForIndex(entry.word) === normalized) return true
+    }
+    return false
   }
 
-  async add(word: string): Promise<SensitiveWordEntry | null> {
+  async getWords(setId: string): Promise<SensitiveWordEntry[] | null> {
+    await this.ensureLoaded()
+    const set = this.store!.sets.find((s) => s.id === setId)
+    if (!set) return null
+    return [...set.entries]
+  }
+
+  async addWord(setId: string, word: string): Promise<SensitiveWordEntry | null> {
     await this.mutex.acquire()
     try {
       await this.ensureLoaded()
-
-      if (this.store!.entries.length >= MAX_ENTRIES) return null
-
+      const set = this.store!.sets.find((s) => s.id === setId)
+      if (!set) return null
+      if (set.entries.length >= MAX_ENTRIES_PER_SET) return null
       const validated = this.validateWord(word)
       if (!validated) return null
-      if (this.isDuplicate(validated)) return null
+      if (this.isDuplicateInSet(set, validated)) return null
 
       const entry: SensitiveWordEntry = {
         id: randomUUID(),
@@ -137,9 +247,9 @@ class SensitiveWordsManager {
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }
-
-      this.store!.entries.push(entry)
-      this.rebuildMatcher()
+      set.entries.push(entry)
+      set.updatedAt = Date.now()
+      this.invalidateSet(setId)
       await this.save()
       return entry
     } finally {
@@ -147,47 +257,42 @@ class SensitiveWordsManager {
     }
   }
 
-  async addBatch(words: string[]): Promise<{ added: number; skipped: number }> {
+  async addWordBatch(setId: string, words: string[]): Promise<{ added: number; skipped: number } | null> {
     await this.mutex.acquire()
     try {
       await this.ensureLoaded()
+      const set = this.store!.sets.find((s) => s.id === setId)
+      if (!set) return null
 
       let added = 0
       let skipped = 0
       const batchSeen = new Set<string>()
 
       for (const word of words) {
-        if (this.store!.entries.length >= MAX_ENTRIES) {
+        if (set.entries.length >= MAX_ENTRIES_PER_SET) {
           skipped += words.length - added - skipped
           break
         }
 
         const validated = this.validateWord(word)
-        if (!validated) {
-          skipped++
-          continue
-        }
+        if (!validated) { skipped++; continue }
 
         const normalized = this.normalizeForIndex(validated)
-        if (this.isDuplicate(validated) || batchSeen.has(normalized)) {
-          skipped++
-          continue
-        }
+        if (this.isDuplicateInSet(set, validated) || batchSeen.has(normalized)) { skipped++; continue }
 
         batchSeen.add(normalized)
-        const id = randomUUID()
-        this.store!.entries.push({
-          id,
+        set.entries.push({
+          id: randomUUID(),
           word: validated,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         })
-        this.wordIndex.set(normalized, id)
         added++
       }
 
       if (added > 0) {
-        this.rebuildMatcher()
+        set.updatedAt = Date.now()
+        this.invalidateSet(setId)
         await this.save()
       }
 
@@ -197,42 +302,41 @@ class SensitiveWordsManager {
     }
   }
 
-  async update(id: string, word: string): Promise<SensitiveWordEntry | null> {
+  async updateWord(setId: string, wordId: string, word: string): Promise<SensitiveWordEntry | null> {
     await this.mutex.acquire()
     try {
       await this.ensureLoaded()
-
-      const idx = this.store!.entries.findIndex((e) => e.id === id)
+      const set = this.store!.sets.find((s) => s.id === setId)
+      if (!set) return null
+      const idx = set.entries.findIndex((e) => e.id === wordId)
       if (idx === -1) return null
 
       const validated = this.validateWord(word)
       if (!validated) return null
-      if (this.isDuplicate(validated, id)) return null
+      if (this.isDuplicateInSet(set, validated, wordId)) return null
 
-      this.store!.entries[idx] = {
-        ...this.store!.entries[idx],
-        word: validated,
-        updatedAt: Date.now(),
-      }
-
-      this.rebuildMatcher()
+      set.entries[idx] = { ...set.entries[idx], word: validated, updatedAt: Date.now() }
+      set.updatedAt = Date.now()
+      this.invalidateSet(setId)
       await this.save()
-      return this.store!.entries[idx]
+      return set.entries[idx]
     } finally {
       this.mutex.release()
     }
   }
 
-  async remove(id: string): Promise<boolean> {
+  async removeWord(setId: string, wordId: string): Promise<boolean> {
     await this.mutex.acquire()
     try {
       await this.ensureLoaded()
-
-      const idx = this.store!.entries.findIndex((e) => e.id === id)
+      const set = this.store!.sets.find((s) => s.id === setId)
+      if (!set) return false
+      const idx = set.entries.findIndex((e) => e.id === wordId)
       if (idx === -1) return false
 
-      this.store!.entries.splice(idx, 1)
-      this.rebuildMatcher()
+      set.entries.splice(idx, 1)
+      set.updatedAt = Date.now()
+      this.invalidateSet(setId)
       await this.save()
       return true
     } finally {
@@ -240,35 +344,17 @@ class SensitiveWordsManager {
     }
   }
 
-  async removeBatch(ids: string[]): Promise<number> {
+  async clearWords(setId: string): Promise<number | null> {
     await this.mutex.acquire()
     try {
       await this.ensureLoaded()
+      const set = this.store!.sets.find((s) => s.id === setId)
+      if (!set) return null
 
-      const idSet = new Set(ids)
-      const originalLength = this.store!.entries.length
-      this.store!.entries = this.store!.entries.filter((e) => !idSet.has(e.id))
-      const removed = originalLength - this.store!.entries.length
-
-      if (removed > 0) {
-        this.rebuildMatcher()
-        await this.save()
-      }
-
-      return removed
-    } finally {
-      this.mutex.release()
-    }
-  }
-
-  async clear(): Promise<number> {
-    await this.mutex.acquire()
-    try {
-      await this.ensureLoaded()
-
-      const count = this.store!.entries.length
-      this.store!.entries = []
-      this.rebuildMatcher()
+      const count = set.entries.length
+      set.entries = []
+      set.updatedAt = Date.now()
+      this.invalidateSet(setId)
       await this.save()
       return count
     } finally {
@@ -276,9 +362,11 @@ class SensitiveWordsManager {
     }
   }
 
-  async getCompiledMatcher(): Promise<CompiledMatcher> {
-    await this.ensureLoaded()
-    return this.matcher!
+  unbindWordSet(setId: string, credentials: { wordSetIds: string[] }[]): void {
+    for (const cred of credentials) {
+      const idx = cred.wordSetIds.indexOf(setId)
+      if (idx !== -1) cred.wordSetIds.splice(idx, 1)
+    }
   }
 }
 

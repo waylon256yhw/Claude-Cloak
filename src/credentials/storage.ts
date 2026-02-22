@@ -15,9 +15,15 @@ export class CredentialStorage extends JsonStore<CredentialStore> {
   protected deserialize(raw: Record<string, unknown>): CredentialStore {
     const rawCreds = Array.isArray(raw.credentials) ? raw.credentials : []
     for (const cred of rawCreds) {
-      if (cred && typeof cred === 'object' && 'isActive' in cred && !('enabled' in cred)) {
-        (cred as Record<string, unknown>).enabled = true
-        delete (cred as Record<string, unknown>).isActive
+      if (cred && typeof cred === 'object') {
+        const obj = cred as Record<string, unknown>
+        if ('isActive' in obj && !('enabled' in obj)) {
+          obj.enabled = true
+          delete obj.isActive
+        }
+        if (!Array.isArray(obj.wordSetIds)) {
+          obj.wordSetIds = []
+        }
       }
     }
     return { credentials: rawCreds as Credential[] }
@@ -28,7 +34,10 @@ export class CredentialStorage extends JsonStore<CredentialStore> {
     if (!raw) return null
     const needsMigration = 'activeId' in raw ||
       (Array.isArray(raw.credentials) && raw.credentials.some(
-        (c: unknown) => c && typeof c === 'object' && 'isActive' in (c as Record<string, unknown>)
+        (c: unknown) => c && typeof c === 'object' && (
+          'isActive' in (c as Record<string, unknown>) ||
+          !Array.isArray((c as Record<string, unknown>).wordSetIds)
+        )
       ))
     const store = this.deserialize(raw)
     if (needsMigration) {

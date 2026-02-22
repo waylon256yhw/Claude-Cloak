@@ -1190,3 +1190,121 @@ input:focus {
     background: var(--bg-panel-hover);
     color: var(--text-muted);
 }
+
+/* --- WORD SET TAGS ON CREDENTIAL CARDS --- */
+.word-set-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    justify-content: flex-end;
+}
+
+.word-set-tag {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.45rem;
+    background: var(--accent-surface);
+    color: var(--accent-primary);
+    border-radius: 4px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* --- WORDS POPOVER --- */
+.words-popover {
+    z-index: 1100;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-btn);
+    box-shadow: var(--shadow-hover);
+    min-width: 220px;
+    max-width: 300px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 0.5rem 0;
+}
+
+.popover-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.15s;
+}
+
+.popover-item:hover {
+    background: var(--bg-panel-hover);
+}
+
+.popover-item input[type="checkbox"] {
+    accent-color: var(--accent-primary);
+    flex-shrink: 0;
+}
+
+.popover-item-name {
+    flex: 1;
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+.popover-item-count {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+}
+
+.popover-empty {
+    padding: 1rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+/* --- WORD SET LIST --- */
+.word-set-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.word-set-card .collapsible-header {
+    padding: 1rem 1.5rem;
+}
+
+.ws-name {
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.ws-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+.ws-actions {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.ws-search-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-btn);
+    background: var(--bg-input);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+}
+
+.ws-search-input:focus {
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-glow);
+    outline: none;
+}
+
+.word-set-card .collapsible-content {
+    max-height: 500px;
+}

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claude Cloak - Admin</title>
-    <link rel="stylesheet" href="styles.css?v=16">
+    <link rel="stylesheet" href="styles.css?v=17">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22 fill=%22%230d9488%22><path d=%22M50 8C27 8 10 27 10 52V90L50 73L90 90V52C90 27 73 8 50 8Z%22/></svg>">
 </head>
 <body>
@@ -139,47 +139,10 @@
                 </div>
 
                 <div class="section-header" style="margin-top: 2.5rem;">
-                    <h2>Sensitive Words</h2>
-                    <div class="header-actions">
-                        <button id="btnImportWords" class="btn btn-secondary btn-sm">Batch Import</button>
-                        <button id="btnClearWords" class="btn btn-danger btn-sm">Clear All</button>
-                        <button id="btnAddWord" class="btn btn-primary btn-sm">+ Add Word</button>
-                    </div>
+                    <h2>Word Sets</h2>
+                    <button id="btnAddWordSet" class="btn btn-primary btn-sm">+ New Word Set</button>
                 </div>
-                <div class="settings-card">
-                    <div class="setting-row">
-                        <div class="setting-info">
-                            <span class="setting-label">Word Obfuscation</span>
-                            <span class="setting-desc">Insert zero-width characters to bypass upstream detection</span>
-                        </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="sensitiveWordsToggle">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                </div>
-                <div class="card collapsible-card" style="padding: 0; overflow: hidden; margin-top: 1rem;">
-                    <div class="collapsible-header" id="wordsListHeader">
-                        <span class="collapsible-title">
-                            <span class="collapsible-icon">▶</span>
-                            <span id="wordsCountLabel">0 words configured</span>
-                        </span>
-                        <span class="collapsible-hint">Click to expand</span>
-                    </div>
-                    <div class="collapsible-content collapsed" id="wordsListContent">
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Word / Pattern</th>
-                                        <th style="width: 120px; text-align: right;">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="sensitiveWordsList"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                <div id="wordSetList" class="word-set-list"></div>
             </div>
         </main>
 
@@ -237,14 +200,36 @@
 
         <div id="toastContainer" class="toast-container"></div>
 
-        <!-- Add/Edit Word Modal -->
+        <!-- Word Set Name Modal (create/rename) -->
+        <div id="wordSetNameModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="wordSetNameModalTitle">New Word Set</h3>
+                    <button class="btn-close" id="btnWordSetNameModalClose">&times;</button>
+                </div>
+                <form id="wordSetNameForm">
+                    <input type="hidden" id="wordSetNameEditId">
+                    <div class="form-group">
+                        <label for="wordSetNameInput">Name</label>
+                        <input type="text" id="wordSetNameInput" required placeholder="e.g. Political, Adult" autocomplete="off">
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" id="btnWordSetNameCancel">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add/Edit Word Modal (scoped to a word set) -->
         <div id="wordModal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3 id="wordModalTitle">Add Sensitive Word</h3>
+                    <h3 id="wordModalTitle">Add Word</h3>
                     <button class="btn-close" id="btnWordModalClose">&times;</button>
                 </div>
                 <form id="wordForm">
+                    <input type="hidden" id="wordEditSetId">
                     <input type="hidden" id="wordEditId">
                     <div class="form-group">
                         <label for="wordPattern">Word or Pattern</label>
@@ -258,7 +243,7 @@
             </div>
         </div>
 
-        <!-- Batch Import Modal -->
+        <!-- Batch Import Modal (scoped to a word set) -->
         <div id="importModal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
@@ -266,6 +251,7 @@
                     <button class="btn-close" id="btnImportModalClose">&times;</button>
                 </div>
                 <form id="importForm">
+                    <input type="hidden" id="importSetId">
                     <div class="form-group">
                         <label for="importText">Words (one per line or comma separated)</label>
                         <textarea id="importText" rows="10" class="form-textarea" placeholder="word1&#10;word2&#10;word3"></textarea>
@@ -372,6 +358,6 @@
             </div>
         </div>
     </div>
-    <script src="app.js?v=16"></script>
+    <script src="app.js?v=17"></script>
 </body>
 </html>

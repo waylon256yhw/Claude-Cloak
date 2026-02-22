@@ -1,22 +1,23 @@
 const API_BASE = '/admin/api';
 
 const AUTH_STORAGE_KEY = 'claude_admin_proxy_key';
-const IDLE_LOGOUT_MS = 30 * 60 * 1000; // 30 minutes, set to 0 to disable
+const IDLE_LOGOUT_MS = 30 * 60 * 1000;
 
 let credentials = [];
 let apiKeys = [];
 let fallbackModels = [];
 let modelTestModelId = '';
-let sensitiveWords = [];
-let wordsDisplayLimit = 50;
-let wordsSearchQuery = '';
-let wordsSearchTimer = null;
+let wordSets = [];
+let expandedWordSetId = null;
+let wordSetWords = {};
+let wordsDisplayLimits = {};
+let wordsSearchQueries = {};
+let wordsSearchTimers = {};
 const WORDS_PAGE_SIZE = 50;
 let idleTimer = null;
 let idleListenersAttached = false;
 let unauthorizedHandled = false;
 
-// Storage helpers
 function getStoredProxyKey() {
     return sessionStorage.getItem(AUTH_STORAGE_KEY) || localStorage.getItem(AUTH_STORAGE_KEY);
 }
@@ -42,7 +43,6 @@ function clearStoredProxyKey() {
     localStorage.removeItem(AUTH_STORAGE_KEY);
 }
 
-// UI State
 function setAuthedUI(authed) {
     const btnLogout = document.getElementById('btnLogout');
     if (btnLogout) btnLogout.classList.toggle('hidden', !authed);
@@ -78,11 +78,9 @@ function logout(reason = 'Logged out') {
     showAuthOverlay(reason);
 }
 
-// Idle logout
 function resetIdleLogoutTimer() {
     if (!IDLE_LOGOUT_MS) return;
     if (getStoredProxyKeySource() !== 'session') return;
-
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => logout('Logged out due to inactivity'), IDLE_LOGOUT_MS);
 }
@@ -90,20 +88,16 @@ function resetIdleLogoutTimer() {
 function attachIdleLogoutListeners() {
     if (idleListenersAttached) return;
     idleListenersAttached = true;
-
     const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
     events.forEach((evt) => window.addEventListener(evt, resetIdleLogoutTimer, { passive: true }));
 }
 
-// Validation
 async function validateProxyKey(key) {
     try {
         const res = await fetch(`${API_BASE}/settings`, {
             headers: { 'x-api-key': key }
         });
-
         if (res.ok) return { ok: true };
-
         const data = await res.json().catch(() => null);
         return { ok: false, message: data?.message || `Login failed (${res.status})` };
     } catch {
@@ -118,7 +112,6 @@ async function ensureAuthenticated() {
         showAuthOverlay('');
         return false;
     }
-
     const result = await validateProxyKey(key);
     if (!result.ok) {
         clearStoredProxyKey();
@@ -126,14 +119,12 @@ async function ensureAuthenticated() {
         showAuthOverlay(result.message || 'Unauthorized');
         return false;
     }
-
     hideAuthOverlay();
     setAuthedUI(true);
     resetIdleLogoutTimer();
     return true;
 }
 
-// SVG Icons
 const icons = {
     pulse: `<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="currentColor"/><path d="M10 2V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 15V18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 10L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 10L2 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
     power: `<svg viewBox="0 0 20 20" fill="none"><path d="M10 3V9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 5.5C16.5 7 18 9.5 18 12C18 15.5 14.5 18 10 18C5.5 18 2 15.5 2 12C2 9.5 3.5 7 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
@@ -144,10 +135,10 @@ const icons = {
     lightning: `<svg viewBox="0 0 20 20" fill="none"><path d="M12 2L4 12h5l-1 6 8-10h-5l1-6z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
     spinner: `<svg viewBox="0 0 20 20" fill="none" class="animate-spin"><path d="M10 3v2m0 10v2m7-7h-2M5 10H3m12.95-4.95l-1.414 1.414M6.464 16.464l-1.414 1.414m11.314 0l-1.414-1.414M6.464 3.536L5.05 4.95" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-opacity="0.5"/><path d="M10 3V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
     check: `<svg viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-    cross: `<svg viewBox="0 0 20 20" fill="none"><path d="M15 5L5 15M5 5l10 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    cross: `<svg viewBox="0 0 20 20" fill="none"><path d="M15 5L5 15M5 5l10 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    shield: `<svg viewBox="0 0 20 20" fill="none"><path d="M10 2L3 5v4c0 4.5 3 8.5 7 10 4-1.5 7-5.5 7-10V5l-7-3z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 };
 
-// Theme
 const savedTheme = localStorage.getItem('claude_theme');
 if (savedTheme) {
     document.documentElement.setAttribute('data-theme', savedTheme);
@@ -176,7 +167,6 @@ const els = {
     form: document.getElementById('credentialForm'),
     status: document.getElementById('globalStatus'),
     toastContainer: document.getElementById('toastContainer'),
-
     authOverlay: document.getElementById('authOverlay'),
     loginForm: document.getElementById('loginForm'),
     authKey: document.getElementById('authKey'),
@@ -190,51 +180,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnLogout')?.addEventListener('click', () => logout('Logged out'));
     document.getElementById('strictModeToggle')?.addEventListener('change', toggleStrictMode);
     document.getElementById('normalizeParamsToggle')?.addEventListener('change', toggleNormalizeParams);
-    document.getElementById('sensitiveWordsToggle')?.addEventListener('change', toggleSensitiveWords);
     document.getElementById('quickGuideToggle')?.addEventListener('click', () => {
         document.getElementById('quickGuideCard').classList.toggle('collapsed');
     });
 
-    // Login form submission
     els.loginForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
-
         const key = els.authKey?.value?.trim();
         const remember = !!els.authRemember?.checked;
-
         if (!key) {
             setAuthError('Please enter an admin key');
             return;
         }
-
         setAuthError('');
         const submitBtn = els.loginForm.querySelector('button[type="submit"]');
         if (submitBtn) submitBtn.disabled = true;
-
         try {
             const result = await validateProxyKey(key);
             if (!result.ok) {
                 setAuthError(result.message || 'Invalid admin key');
                 return;
             }
-
             setStoredProxyKey(key, remember);
             hideAuthOverlay();
             setAuthedUI(true);
             showToast('Logged in successfully', 'success');
             resetIdleLogoutTimer();
-
-            loadCredentials();
-            loadApiKeys();
-            loadSettings();
-            loadSensitiveWords();
-            loadModels();
+            loadAll();
         } finally {
             if (submitBtn) submitBtn.disabled = false;
         }
     });
 
-    // Toggle auth password visibility
     document.querySelector('.toggle-auth-visibility')?.addEventListener('click', function() {
         const input = els.authKey;
         if (input) {
@@ -246,38 +223,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     attachIdleLogoutListeners();
     checkStatus();
 
-    // Check auth on load
     const authed = await ensureAuthenticated();
-    if (authed) {
-        loadCredentials();
-        loadApiKeys();
-        loadSettings();
-        loadSensitiveWords();
-        loadModels();
-    }
+    if (authed) loadAll();
 });
 
-// API helper with auth
+function loadAll() {
+    loadCredentials();
+    loadApiKeys();
+    loadSettings();
+    loadWordSets();
+    loadModels();
+}
+
 const hasHeader = (headers, nameLower) => {
     return Object.keys(headers || {}).some((k) => k.toLowerCase() === nameLower);
 };
 
 const api = async (endpoint, options = {}) => {
     const headers = { ...options.headers };
-
-    // Add auth header
     const key = getStoredProxyKey();
     if (key && !hasHeader(headers, 'x-api-key') && !hasHeader(headers, 'authorization')) {
         headers['x-api-key'] = key;
     }
-
     if (options.body && !(options.body instanceof FormData)) {
         headers['Content-Type'] = 'application/json';
     }
-
     try {
         const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
-
         if (res.status === 401) {
             const data = await res.json().catch(() => null);
             if (!unauthorizedHandled) {
@@ -288,12 +260,10 @@ const api = async (endpoint, options = {}) => {
             err.silent = true;
             throw err;
         }
-
         if (!res.ok) {
             const data = await res.json().catch(() => null);
             throw new Error(data?.message || 'Request failed');
         }
-
         resetIdleLogoutTimer();
         return await res.json();
     } catch (err) {
@@ -301,6 +271,8 @@ const api = async (endpoint, options = {}) => {
         throw err;
     }
 };
+
+// --- CREDENTIALS ---
 
 async function loadCredentials() {
     try {
@@ -349,14 +321,11 @@ async function toggleCredential(id, enabled) {
 async function testCredential(btn, id) {
     if (btn.disabled) return;
     const originalContent = btn.innerHTML;
-
     btn.disabled = true;
     btn.classList.add('testing');
     btn.innerHTML = `<span class="btn-content">${icons.spinner}</span>`;
-
     try {
         const result = await api(`/credentials/${id}/test`, { method: 'POST' });
-
         if (result.success) {
             btn.classList.remove('testing');
             btn.classList.add('success');
@@ -370,7 +339,6 @@ async function testCredential(btn, id) {
         const message = err.message?.length > 10 ? 'Failed' : (err.message || 'Failed');
         btn.innerHTML = `<span class="btn-content">${icons.cross}<span>${message}</span></span>`;
     }
-
     setTimeout(() => {
         btn.classList.remove('testing', 'success', 'error');
         btn.innerHTML = originalContent;
@@ -430,6 +398,15 @@ async function toggleNormalizeParams(e) {
     }
 }
 
+function getWordSetTagsHtml(cred) {
+    if (!cred.wordSetIds || cred.wordSetIds.length === 0) return '';
+    const tags = cred.wordSetIds.map(id => {
+        const ws = wordSets.find(s => s.id === id);
+        return ws ? `<span class="word-set-tag">${esc(ws.name)}</span>` : '';
+    }).filter(Boolean).join('');
+    return tags ? `<div class="detail-row"><span>Words</span><div class="word-set-tags">${tags}</div></div>` : '';
+}
+
 function renderList() {
     if (credentials.length === 0) {
         els.list.innerHTML = `
@@ -454,9 +431,11 @@ function renderList() {
                 <div class="detail-row"><span>Target</span><span class="code" title="${esc(cred.targetUrl)}">${esc(cred.targetUrl)}</span></div>
                 <div class="detail-row"><span>Key</span><span class="code">${esc(cred.keyMasked)}</span></div>
                 ${cred.proxyUrl ? `<div class="detail-row"><span>Proxy</span><span class="code" title="${esc(cred.proxyUrl)}">${esc(cred.proxyUrl)}</span></div>` : ''}
+                ${getWordSetTagsHtml(cred)}
             </div>
             <div class="card-actions">
                 <button class="btn-icon btn-test" data-action="test" data-id="${cred.id}" title="Test Connection"><span class="btn-content">${icons.lightning}</span></button>
+                <button class="btn-icon" data-action="words" data-id="${cred.id}" title="Word Sets">${icons.shield}</button>
                 <button class="btn-icon" data-action="edit" data-id="${cred.id}" title="Edit">${icons.faders}</button>
                 <button class="btn-icon btn-icon-danger" data-action="delete" data-id="${cred.id}" title="Delete">${icons.disconnect}</button>
             </div>
@@ -464,7 +443,6 @@ function renderList() {
     `).join('');
 }
 
-// Toggle switch needs change event (click on slider span won't reach the input via closest)
 els.list.addEventListener('change', (e) => {
     const toggle = e.target.closest('[data-action="toggle"]');
     if (toggle) {
@@ -472,17 +450,15 @@ els.list.addEventListener('change', (e) => {
     }
 });
 
-// Event delegation for card actions
 els.list.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
-
     const action = btn.dataset.action;
     const id = btn.dataset.id;
-
     if (action === 'edit') editCredential(id);
     else if (action === 'delete') deleteCredential(id);
     else if (action === 'test') testCredential(btn, id);
+    else if (action === 'words') openWordsPopover(btn, id);
 });
 
 document.getElementById('btnAdd').addEventListener('click', () => openModal());
@@ -494,21 +470,18 @@ els.form.addEventListener('submit', async (e) => {
     const editId = document.getElementById('editId').value || undefined;
     const apiKeyValue = document.getElementById('apiKey').value.trim();
     const isEdit = !!editId;
-
     const proxyUrlValue = document.getElementById('proxyUrl').value.trim();
     const data = {
         id: editId,
         name: document.getElementById('name').value,
         targetUrl: document.getElementById('targetUrl').value
     };
-
     if (!isEdit || apiKeyValue) {
         data.apiKey = apiKeyValue;
     }
     if (!isEdit || proxyUrlValue) {
         data.proxyUrl = proxyUrlValue || null;
     }
-
     await saveCredential(data);
 });
 
@@ -528,7 +501,6 @@ function openModal(cred = null) {
     const apiKeyInput = document.getElementById('apiKey');
     const currentKeyDisplay = document.getElementById('currentKeyDisplay');
     const currentKeyMasked = document.getElementById('currentKeyMasked');
-
     if (isEdit) {
         apiKeyInput.value = '';
         apiKeyInput.removeAttribute('required');
@@ -545,7 +517,6 @@ function openModal(cred = null) {
         proxyUrlInput.value = '';
         proxyUrlInput.placeholder = 'http://user:pass@host:port';
     }
-
     els.modal.classList.remove('hidden');
 }
 
@@ -572,167 +543,400 @@ function showConfirm({ title, message, icon = 'warning', danger = false }) {
         const modal = document.getElementById('confirmModal');
         const iconEl = document.getElementById('confirmIcon');
         const okBtn = document.getElementById('confirmOk');
-
         document.getElementById('confirmTitle').textContent = title;
         document.getElementById('confirmMessage').textContent = message;
         iconEl.className = `confirm-icon ${danger ? 'danger' : 'warning'}`;
         iconEl.innerHTML = icons[icon] || icons.warning;
         okBtn.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
-
         modal.classList.remove('hidden');
-
         const cleanup = (result) => {
             modal.classList.add('hidden');
             document.getElementById('confirmOk').onclick = null;
             document.getElementById('confirmCancel').onclick = null;
             resolve(result);
         };
-
         document.getElementById('confirmOk').onclick = () => cleanup(true);
         document.getElementById('confirmCancel').onclick = () => cleanup(false);
     });
 }
 
-// Enhanced escaping function to prevent XSS in HTML context
-// Escapes: & < > " '
 const esc = (str) => {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 };
 
-// --- SENSITIVE WORDS ---
+// --- WORDS POPOVER (Credential → Word Set binding) ---
 
-async function loadSensitiveWords() {
-    try {
-        const data = await api('/sensitive-words');
-        sensitiveWords = data.entries || [];
-        wordsDisplayLimit = WORDS_PAGE_SIZE; // Reset pagination
-        wordsSearchQuery = ''; // Reset search
-        const searchInput = document.getElementById('wordsSearchInput');
-        if (searchInput) searchInput.value = ''; // Sync input with state
-        const toggle = document.getElementById('sensitiveWordsToggle');
-        if (toggle) toggle.checked = data.enabled !== false;
-        ensureWordsSearchInput();
-        renderSensitiveWords();
-    } catch (e) {
-        console.error('Failed to load sensitive words:', e);
+let activePopover = null;
+
+function closeActivePopover() {
+    if (activePopover) {
+        activePopover.remove();
+        activePopover = null;
     }
 }
 
-function ensureWordsSearchInput() {
-    if (document.getElementById('wordsSearchInput')) return;
-    const content = document.getElementById('wordsListContent');
-    if (!content) return;
+document.addEventListener('click', (e) => {
+    if (activePopover && !activePopover.contains(e.target) && !e.target.closest('[data-action="words"]')) {
+        closeActivePopover();
+    }
+});
 
-    const searchDiv = document.createElement('div');
-    searchDiv.className = 'words-search';
-    searchDiv.style.cssText = 'margin-bottom: 0.75rem;';
-    searchDiv.innerHTML = `
-        <input type="text" id="wordsSearchInput"
-               placeholder="Search words..."
-               class="form-input" style="width: 100%;">
-    `;
-    content.insertBefore(searchDiv, content.firstChild);
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeActivePopover();
+});
 
-    const input = document.getElementById('wordsSearchInput');
-    input.addEventListener('input', (e) => {
-        clearTimeout(wordsSearchTimer);
-        wordsSearchTimer = setTimeout(() => {
-            wordsSearchQuery = e.target.value.toLowerCase().trim();
-            wordsDisplayLimit = WORDS_PAGE_SIZE;
-            renderSensitiveWords();
-        }, 200);
-    });
-}
+function openWordsPopover(btn, credId) {
+    closeActivePopover();
 
-function renderSensitiveWords() {
-    const tbody = document.getElementById('sensitiveWordsList');
-    if (!tbody) return;
+    const cred = credentials.find(c => c.id === credId);
+    if (!cred) return;
 
-    // Apply search filter
-    let filtered = sensitiveWords;
-    if (wordsSearchQuery) {
-        filtered = sensitiveWords.filter(w =>
-            w.word.toLowerCase().includes(wordsSearchQuery)
-        );
+    const popover = document.createElement('div');
+    popover.className = 'words-popover';
+
+    if (wordSets.length === 0) {
+        popover.innerHTML = `<div class="popover-empty">No word sets. Create one in the Word Sets section below.</div>`;
+    } else {
+        popover.innerHTML = wordSets.map(ws => {
+            const checked = cred.wordSetIds?.includes(ws.id);
+            return `
+                <label class="popover-item">
+                    <input type="checkbox" data-ws-id="${ws.id}" ${checked ? 'checked' : ''}>
+                    <span class="popover-item-name">${esc(ws.name)}</span>
+                    <span class="popover-item-count">${ws.entryCount}</span>
+                </label>
+            `;
+        }).join('');
     }
 
-    // Update count label
-    const countLabel = document.getElementById('wordsCountLabel');
-    if (countLabel) {
-        const total = sensitiveWords.length;
-        const shown = filtered.length;
-        if (wordsSearchQuery && shown !== total) {
-            countLabel.textContent = `${shown} / ${total} words (filtered)`;
-        } else {
-            countLabel.textContent = total === 0 ? 'No words configured' :
-                total === 1 ? '1 word configured' : `${total} words configured`;
+    popover.addEventListener('change', async (e) => {
+        const checkbox = e.target;
+        if (!checkbox.dataset.wsId) return;
+        const currentIds = new Set(cred.wordSetIds || []);
+        if (checkbox.checked) currentIds.add(checkbox.dataset.wsId);
+        else currentIds.delete(checkbox.dataset.wsId);
+        try {
+            await api(`/credentials/${credId}/word-sets`, {
+                method: 'PUT',
+                body: JSON.stringify({ wordSetIds: [...currentIds] })
+            });
+            cred.wordSetIds = [...currentIds];
+            renderList();
+            // Re-open the popover on the new button since renderList() rebuilds DOM
+            const newBtn = els.list.querySelector(`[data-action="words"][data-id="${credId}"]`);
+            if (newBtn) openWordsPopover(newBtn, credId);
+        } catch (e) {
+            checkbox.checked = !checkbox.checked;
         }
-    }
+    });
 
-    if (filtered.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="2" style="text-align: center; padding: 3rem; color: var(--text-muted);">
-                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">${wordsSearchQuery ? '🔍' : '🛡️'}</div>
-                    <p>${wordsSearchQuery ? 'No matching words found.' : 'No sensitive words configured.'}</p>
-                </td>
-            </tr>
+    const rect = btn.getBoundingClientRect();
+    popover.style.position = 'fixed';
+    popover.style.top = `${rect.bottom + 4}px`;
+    popover.style.left = `${rect.left}px`;
+
+    document.body.appendChild(popover);
+    activePopover = popover;
+
+    const popRect = popover.getBoundingClientRect();
+    if (popRect.right > window.innerWidth) {
+        popover.style.left = `${window.innerWidth - popRect.width - 8}px`;
+    }
+    if (popRect.bottom > window.innerHeight) {
+        popover.style.top = `${rect.top - popRect.height - 4}px`;
+    }
+}
+
+// --- WORD SETS ---
+
+async function loadWordSets() {
+    try {
+        wordSets = await api('/word-sets');
+        renderWordSets();
+        renderList();
+    } catch (e) {
+        console.error('Failed to load word sets:', e);
+    }
+}
+
+function renderWordSets() {
+    const container = document.getElementById('wordSetList');
+    if (!container) return;
+
+    if (wordSets.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="padding: 2rem;">
+                <div class="empty-state-icon">🛡️</div>
+                <h3>No word sets</h3>
+                <p>Create a word set to start obfuscating sensitive content per credential.</p>
+            </div>
         `;
         return;
     }
 
-    const visibleWords = filtered.slice(0, wordsDisplayLimit);
-    const hasMore = filtered.length > wordsDisplayLimit;
-
-    let html = visibleWords.map(word => `
-        <tr>
-            <td>
-                <span class="word-pattern">${esc(word.word)}</span>
-            </td>
-            <td>
-                <div class="actions-cell">
-                    <button class="btn-icon" data-word-action="edit" data-id="${word.id}" title="Edit">${icons.faders}</button>
-                    <button class="btn-icon btn-icon-danger" data-word-action="delete" data-id="${word.id}" title="Delete">${icons.trash}</button>
+    container.innerHTML = wordSets.map(ws => {
+        const isExpanded = expandedWordSetId === ws.id;
+        return `
+            <div class="card collapsible-card word-set-card" style="padding: 0; overflow: hidden; margin-bottom: 1rem;" data-ws-id="${ws.id}">
+                <div class="collapsible-header ws-header" data-ws-toggle="${ws.id}">
+                    <span class="collapsible-title">
+                        <span class="collapsible-icon">${isExpanded ? '▼' : '▶'}</span>
+                        <span class="ws-name">${esc(ws.name)}</span>
+                        <span class="ws-meta">${ws.entryCount} words · ${ws.credentialCount} credential${ws.credentialCount !== 1 ? 's' : ''}</span>
+                    </span>
+                    <div class="ws-actions" onclick="event.stopPropagation()">
+                        <button class="btn-icon" data-ws-action="rename" data-ws-id="${ws.id}" title="Rename">${icons.faders}</button>
+                        <button class="btn-icon btn-icon-danger" data-ws-action="delete" data-ws-id="${ws.id}" title="Delete">${icons.trash}</button>
+                    </div>
                 </div>
-            </td>
-        </tr>
-    `).join('');
+                <div class="collapsible-content ${isExpanded ? '' : 'collapsed'}" id="wsContent-${ws.id}">
+                    ${isExpanded ? renderWordSetContent(ws) : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
 
-    if (hasMore) {
-        const remaining = filtered.length - wordsDisplayLimit;
-        html += `
+function renderWordSetContent(ws) {
+    const words = wordSetWords[ws.id] || [];
+    const searchQuery = wordsSearchQueries[ws.id] || '';
+    const displayLimit = wordsDisplayLimits[ws.id] || WORDS_PAGE_SIZE;
+
+    let filtered = words;
+    if (searchQuery) {
+        filtered = words.filter(w => w.word.toLowerCase().includes(searchQuery));
+    }
+
+    const visibleWords = filtered.slice(0, displayLimit);
+    const hasMore = filtered.length > displayLimit;
+
+    const countText = searchQuery && filtered.length !== words.length
+        ? `${filtered.length} / ${words.length} words (filtered)`
+        : words.length === 0 ? 'No words' : `${words.length} word${words.length !== 1 ? 's' : ''}`;
+
+    let tableHtml;
+    if (filtered.length === 0) {
+        tableHtml = `
             <tr>
-                <td colspan="2" style="text-align: center; padding: 1rem;">
-                    <button class="btn btn-secondary btn-sm" id="btnLoadMoreWords">
-                        Load more (${remaining} remaining)
-                    </button>
+                <td colspan="2" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <p>${searchQuery ? 'No matching words found.' : 'No words in this set.'}</p>
                 </td>
             </tr>
         `;
+    } else {
+        tableHtml = visibleWords.map(word => `
+            <tr>
+                <td><span class="word-pattern">${esc(word.word)}</span></td>
+                <td>
+                    <div class="actions-cell">
+                        <button class="btn-icon" data-word-action="edit" data-ws-id="${ws.id}" data-id="${word.id}" title="Edit">${icons.faders}</button>
+                        <button class="btn-icon btn-icon-danger" data-word-action="delete" data-ws-id="${ws.id}" data-id="${word.id}" title="Delete">${icons.trash}</button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+
+        if (hasMore) {
+            const remaining = filtered.length - displayLimit;
+            tableHtml += `
+                <tr>
+                    <td colspan="2" style="text-align: center; padding: 1rem;">
+                        <button class="btn btn-secondary btn-sm" data-word-action="loadmore" data-ws-id="${ws.id}">
+                            Load more (${remaining} remaining)
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }
     }
 
-    tbody.innerHTML = html;
+    return `
+        <div style="padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <span class="text-muted" style="font-size: 0.85rem;">${countText}</span>
+            <div class="header-actions">
+                <button class="btn btn-secondary btn-sm" data-ws-action="import" data-ws-id="${ws.id}">Import</button>
+                <button class="btn btn-danger btn-sm" data-ws-action="clear" data-ws-id="${ws.id}">Clear</button>
+                <button class="btn btn-primary btn-sm" data-ws-action="addword" data-ws-id="${ws.id}">+ Add</button>
+            </div>
+        </div>
+        <div style="padding: 0.5rem 1rem;">
+            <input type="text" class="form-input ws-search-input" data-ws-search="${ws.id}"
+                   placeholder="Search words..." value="${esc(searchQuery)}" style="width: 100%; margin-bottom: 0.5rem;">
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Word / Pattern</th>
+                        <th style="width: 120px; text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>${tableHtml}</tbody>
+            </table>
+        </div>
+    `;
 }
 
-async function toggleSensitiveWords(e) {
-    const enabled = e.target.checked;
+function refreshWordSetContent(wsId) {
+    const ws = wordSets.find(s => s.id === wsId);
+    if (!ws) return;
+    const content = document.getElementById(`wsContent-${wsId}`);
+    if (content) {
+        content.innerHTML = renderWordSetContent(ws);
+    }
+}
+
+async function loadWordSetWords(wsId) {
     try {
-        await api('/sensitive-words/settings', { method: 'PUT', body: JSON.stringify({ enabled }) });
-        showToast(`Word Obfuscation ${enabled ? 'enabled' : 'disabled'}`, 'success');
-    } catch (err) {
-        e.target.checked = !enabled;
+        const words = await api(`/word-sets/${wsId}/words`);
+        wordSetWords[wsId] = words;
+        if (!wordsDisplayLimits[wsId]) wordsDisplayLimits[wsId] = WORDS_PAGE_SIZE;
+        refreshWordSetContent(wsId);
+    } catch (e) {
+        console.error('Failed to load words for set', wsId, e);
     }
 }
 
-function openWordModal(word = null) {
+// Word set list event delegation
+document.getElementById('wordSetList')?.addEventListener('click', (e) => {
+    // Toggle expand/collapse
+    const toggleHeader = e.target.closest('[data-ws-toggle]');
+    if (toggleHeader && !e.target.closest('.ws-actions')) {
+        const wsId = toggleHeader.dataset.wsToggle;
+        if (expandedWordSetId === wsId) {
+            expandedWordSetId = null;
+            renderWordSets();
+        } else {
+            expandedWordSetId = wsId;
+            renderWordSets();
+            loadWordSetWords(wsId);
+        }
+        return;
+    }
+
+    // Word set actions (rename, delete)
+    const wsActionBtn = e.target.closest('[data-ws-action]');
+    if (wsActionBtn) {
+        const action = wsActionBtn.dataset.wsAction;
+        const wsId = wsActionBtn.dataset.wsId;
+        if (action === 'rename') renameWordSet(wsId);
+        else if (action === 'delete') deleteWordSet(wsId);
+        else if (action === 'addword') openWordModal(null, wsId);
+        else if (action === 'import') openImportModal(wsId);
+        else if (action === 'clear') clearWordSetWords(wsId);
+        return;
+    }
+
+    // Word actions (edit, delete, loadmore)
+    const wordActionBtn = e.target.closest('[data-word-action]');
+    if (wordActionBtn) {
+        const action = wordActionBtn.dataset.wordAction;
+        const wsId = wordActionBtn.dataset.wsId;
+        const wordId = wordActionBtn.dataset.id;
+        if (action === 'edit') {
+            const word = (wordSetWords[wsId] || []).find(w => w.id === wordId);
+            if (word) openWordModal(word, wsId);
+        } else if (action === 'delete') {
+            deleteWord(wsId, wordId);
+        } else if (action === 'loadmore') {
+            wordsDisplayLimits[wsId] = (wordsDisplayLimits[wsId] || WORDS_PAGE_SIZE) + WORDS_PAGE_SIZE;
+            refreshWordSetContent(wsId);
+        }
+        return;
+    }
+});
+
+// Search input delegation
+document.getElementById('wordSetList')?.addEventListener('input', (e) => {
+    const searchInput = e.target.closest('[data-ws-search]');
+    if (!searchInput) return;
+    const wsId = searchInput.dataset.wsSearch;
+    clearTimeout(wordsSearchTimers[wsId]);
+    wordsSearchTimers[wsId] = setTimeout(() => {
+        wordsSearchQueries[wsId] = searchInput.value.toLowerCase().trim();
+        wordsDisplayLimits[wsId] = WORDS_PAGE_SIZE;
+        refreshWordSetContent(wsId);
+    }, 200);
+});
+
+// Create word set
+document.getElementById('btnAddWordSet')?.addEventListener('click', () => {
+    document.getElementById('wordSetNameModalTitle').textContent = 'New Word Set';
+    document.getElementById('wordSetNameEditId').value = '';
+    document.getElementById('wordSetNameInput').value = '';
+    document.getElementById('wordSetNameModal').classList.remove('hidden');
+    document.getElementById('wordSetNameInput').focus();
+});
+
+document.getElementById('btnWordSetNameModalClose')?.addEventListener('click', () => {
+    document.getElementById('wordSetNameModal').classList.add('hidden');
+});
+document.getElementById('btnWordSetNameCancel')?.addEventListener('click', () => {
+    document.getElementById('wordSetNameModal').classList.add('hidden');
+});
+
+document.getElementById('wordSetNameForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const editId = document.getElementById('wordSetNameEditId').value;
+    const name = document.getElementById('wordSetNameInput').value.trim();
+    if (!name) return;
+
+    try {
+        if (editId) {
+            await api(`/word-sets/${editId}`, { method: 'PUT', body: JSON.stringify({ name }) });
+            showToast('Word set renamed', 'success');
+        } else {
+            await api('/word-sets', { method: 'POST', body: JSON.stringify({ name }) });
+            showToast('Word set created', 'success');
+        }
+        document.getElementById('wordSetNameModal').classList.add('hidden');
+        loadWordSets();
+    } catch (e) { /* handled */ }
+});
+
+async function renameWordSet(wsId) {
+    const ws = wordSets.find(s => s.id === wsId);
+    if (!ws) return;
+    document.getElementById('wordSetNameModalTitle').textContent = 'Rename Word Set';
+    document.getElementById('wordSetNameEditId').value = wsId;
+    document.getElementById('wordSetNameInput').value = ws.name;
+    document.getElementById('wordSetNameModal').classList.remove('hidden');
+    document.getElementById('wordSetNameInput').focus();
+}
+
+async function deleteWordSet(wsId) {
+    const ws = wordSets.find(s => s.id === wsId);
+    if (!ws) return;
+    if (!await showConfirm({
+        title: 'Delete Word Set',
+        message: `Delete "${ws.name}"? All words in this set will be lost and bindings removed.`,
+        icon: 'trash',
+        danger: true
+    })) return;
+    try {
+        await api(`/word-sets/${wsId}`, { method: 'DELETE' });
+        showToast('Word set deleted', 'success');
+        if (expandedWordSetId === wsId) expandedWordSetId = null;
+        delete wordSetWords[wsId];
+        delete wordsDisplayLimits[wsId];
+        delete wordsSearchQueries[wsId];
+        loadWordSets();
+        loadCredentials();
+    } catch (e) { /* handled */ }
+}
+
+// --- WORD CRUD (scoped to word set) ---
+
+function openWordModal(word, wsId) {
     const isEdit = !!word;
     document.getElementById('wordModalTitle').textContent = isEdit ? 'Edit Word' : 'Add Word';
+    document.getElementById('wordEditSetId').value = wsId;
     document.getElementById('wordEditId').value = word ? word.id : '';
     document.getElementById('wordPattern').value = word ? word.word : '';
     document.getElementById('wordModal').classList.remove('hidden');
@@ -744,114 +948,85 @@ function closeWordModal() {
     document.getElementById('wordForm').reset();
 }
 
+document.getElementById('btnWordModalClose')?.addEventListener('click', closeWordModal);
+document.getElementById('btnWordCancel')?.addEventListener('click', closeWordModal);
+
+document.getElementById('wordForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const setId = document.getElementById('wordEditSetId').value;
+    const wordId = document.getElementById('wordEditId').value;
+    const word = document.getElementById('wordPattern').value.trim();
+    if (!word || !setId) return;
+
+    const method = wordId ? 'PUT' : 'POST';
+    const url = wordId ? `/word-sets/${setId}/words/${wordId}` : `/word-sets/${setId}/words`;
+
+    try {
+        await api(url, { method, body: JSON.stringify({ word }) });
+        showToast(`Word ${wordId ? 'updated' : 'added'} successfully`, 'success');
+        closeWordModal();
+        loadWordSetWords(setId);
+        loadWordSets();
+    } catch (e) { /* handled */ }
+});
+
+async function deleteWord(wsId, wordId) {
+    if (!await showConfirm({ title: 'Delete Word', message: 'Remove this word?', icon: 'trash', danger: true })) return;
+    try {
+        await api(`/word-sets/${wsId}/words/${wordId}`, { method: 'DELETE' });
+        showToast('Word deleted', 'success');
+        loadWordSetWords(wsId);
+        loadWordSets();
+    } catch (e) { /* handled */ }
+}
+
+async function clearWordSetWords(wsId) {
+    if (!await showConfirm({
+        title: 'Clear All Words',
+        message: 'This will remove ALL words from this set. This action cannot be undone.',
+        icon: 'warning',
+        danger: true
+    })) return;
+    try {
+        const result = await api(`/word-sets/${wsId}/words`, { method: 'DELETE' });
+        showToast(`Cleared ${result.cleared} words`, 'success');
+        loadWordSetWords(wsId);
+        loadWordSets();
+    } catch (e) { /* handled */ }
+}
+
+// --- BATCH IMPORT (scoped to word set) ---
+
+function openImportModal(wsId) {
+    document.getElementById('importSetId').value = wsId;
+    document.getElementById('importText').value = '';
+    document.getElementById('importModal').classList.remove('hidden');
+}
+
 function closeImportModal() {
     document.getElementById('importModal').classList.add('hidden');
     document.getElementById('importForm').reset();
 }
 
-async function handleWordSubmit(e) {
+document.getElementById('btnImportModalClose')?.addEventListener('click', closeImportModal);
+document.getElementById('btnImportCancel')?.addEventListener('click', closeImportModal);
+
+document.getElementById('importForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const id = document.getElementById('wordEditId').value;
-    const word = document.getElementById('wordPattern').value.trim();
-    if (!word) return;
-
-    const method = id ? 'PUT' : 'POST';
-    const url = id ? `/sensitive-words/${id}` : '/sensitive-words';
-
-    try {
-        await api(url, { method, body: JSON.stringify({ word }) });
-        showToast(`Word ${id ? 'updated' : 'added'} successfully`, 'success');
-        closeWordModal();
-        loadSensitiveWords();
-    } catch (e) { /* handled by api() */ }
-}
-
-async function handleImportSubmit(e) {
-    e.preventDefault();
+    const setId = document.getElementById('importSetId').value;
     const text = document.getElementById('importText').value;
     const words = text.split(/[\n,]+/).map(w => w.trim()).filter(w => w.length > 0);
-
     if (words.length === 0) {
         showToast('No valid words found to import', 'error');
         return;
     }
-
     try {
-        const result = await api('/sensitive-words/batch', { method: 'POST', body: JSON.stringify({ words }) });
+        const result = await api(`/word-sets/${setId}/words/batch`, { method: 'POST', body: JSON.stringify({ words }) });
         showToast(`Imported ${result.added} words (${result.skipped} skipped)`, 'success');
         closeImportModal();
-        loadSensitiveWords();
+        loadWordSetWords(setId);
+        loadWordSets();
     } catch (e) { /* handled */ }
-}
-
-async function deleteWord(id) {
-    if (!await showConfirm({ title: 'Delete Word', message: 'Remove this sensitive word?', icon: 'trash', danger: true })) return;
-    try {
-        await api(`/sensitive-words/${id}`, { method: 'DELETE' });
-        showToast('Word deleted', 'success');
-        loadSensitiveWords();
-    } catch (e) { /* handled */ }
-}
-
-async function clearAllWords() {
-    if (!await showConfirm({
-        title: 'Clear All Words',
-        message: 'This will remove ALL sensitive words. This action cannot be undone.',
-        icon: 'warning',
-        danger: true
-    })) return;
-
-    try {
-        const result = await api('/sensitive-words', { method: 'DELETE' });
-        showToast(`Cleared ${result.cleared} words`, 'success');
-        loadSensitiveWords();
-    } catch (e) { /* handled */ }
-}
-
-// Sensitive words event listeners
-document.getElementById('btnAddWord')?.addEventListener('click', () => openWordModal());
-document.getElementById('btnWordModalClose')?.addEventListener('click', closeWordModal);
-document.getElementById('btnWordCancel')?.addEventListener('click', closeWordModal);
-document.getElementById('wordForm')?.addEventListener('submit', handleWordSubmit);
-
-document.getElementById('btnImportWords')?.addEventListener('click', () => {
-    document.getElementById('importModal').classList.remove('hidden');
-});
-document.getElementById('btnImportModalClose')?.addEventListener('click', closeImportModal);
-document.getElementById('btnImportCancel')?.addEventListener('click', closeImportModal);
-document.getElementById('importForm')?.addEventListener('submit', handleImportSubmit);
-
-document.getElementById('btnClearWords')?.addEventListener('click', clearAllWords);
-
-// Collapsible words list toggle
-document.getElementById('wordsListHeader')?.addEventListener('click', () => {
-    const card = document.querySelector('.collapsible-card');
-    const content = document.getElementById('wordsListContent');
-    if (card && content) {
-        card.classList.toggle('expanded');
-        content.classList.toggle('collapsed');
-    }
-});
-
-// Event delegation for sensitive words table
-document.getElementById('sensitiveWordsList')?.addEventListener('click', (e) => {
-    // Handle "Load more" button
-    if (e.target.id === 'btnLoadMoreWords') {
-        wordsDisplayLimit += WORDS_PAGE_SIZE;
-        renderSensitiveWords();
-        return;
-    }
-
-    const btn = e.target.closest('[data-word-action]');
-    if (!btn) return;
-    const action = btn.dataset.wordAction;
-    const id = btn.dataset.id;
-    if (action === 'edit') {
-        const word = sensitiveWords.find(w => w.id === id);
-        if (word) openWordModal(word);
-    } else if (action === 'delete') {
-        deleteWord(id);
-    }
 });
 
 // --- FALLBACK MODELS ---
@@ -966,7 +1141,6 @@ function closeModelModal() {
     document.getElementById('modelForm').reset();
 }
 
-// Model event listeners
 document.getElementById('btnAddModel')?.addEventListener('click', openModelModal);
 document.getElementById('btnModelModalClose')?.addEventListener('click', closeModelModal);
 document.getElementById('btnModelCancel')?.addEventListener('click', closeModelModal);

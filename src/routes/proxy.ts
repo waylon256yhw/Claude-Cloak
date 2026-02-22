@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import type { Config, ClaudeRequest } from '../types.js'
+import type { Credential } from '../credentials/types.js'
 import { buildStealthHeaders } from '../services/headers.js'
 import { enhanceAnthropicRequest } from '../services/transform.js'
 import { pipeStream } from '../services/stream.js'
@@ -10,6 +11,7 @@ interface UpstreamConfig {
   targetUrl: string
   apiKey: string
   proxyUrl?: string | null
+  credential?: Credential
 }
 
 function getUpstreamConfig(request: FastifyRequest, config: Config): UpstreamConfig {
@@ -17,7 +19,7 @@ function getUpstreamConfig(request: FastifyRequest, config: Config): UpstreamCon
   if (apiKeyEntity?.credentialId) {
     const cred = credentialManager.getById(apiKeyEntity.credentialId)
     if (cred?.enabled) {
-      return { targetUrl: cred.targetUrl, apiKey: cred.apiKey, proxyUrl: cred.proxyUrl }
+      return { targetUrl: cred.targetUrl, apiKey: cred.apiKey, proxyUrl: cred.proxyUrl, credential: cred }
     }
   }
   if (config.targetUrl && config.apiKey) {
@@ -29,25 +31,25 @@ function getUpstreamConfig(request: FastifyRequest, config: Config): UpstreamCon
 export async function proxyRoutes(fastify: FastifyInstance, config: Config) {
   fastify.post('/v1/messages', async (request: FastifyRequest, reply: FastifyReply) => {
     const anthropicRequest = request.body as ClaudeRequest
-    const enhancedRequest = await enhanceAnthropicRequest(anthropicRequest, request.log)
-    return proxyToClaude(config, enhancedRequest, request, reply)
+    let upstream: UpstreamConfig
+    try {
+      upstream = getUpstreamConfig(request, config)
+    } catch (err) {
+      reply.code(503).send({ error: 'Service Unavailable', message: (err as Error).message })
+      return
+    }
+    const enhancedRequest = await enhanceAnthropicRequest(anthropicRequest, request.log, upstream.credential)
+    return proxyToClaude(config, upstream, enhancedRequest, request, reply)
   })
 }
 
 async function proxyToClaude(
   config: Config,
+  upstream: UpstreamConfig,
   body: ClaudeRequest,
   request: FastifyRequest,
   reply: FastifyReply
 ) {
-  let upstream: UpstreamConfig
-  try {
-    upstream = getUpstreamConfig(request, config)
-  } catch (err) {
-    reply.code(503).send({ error: 'Service Unavailable', message: (err as Error).message })
-    return
-  }
-
   const isStream = body.stream === true
   const headers = buildStealthHeaders(upstream.apiKey, isStream)
   const controller = new AbortController()
