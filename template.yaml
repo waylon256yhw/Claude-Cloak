@@ -18,21 +18,22 @@ spec:
     ## Features
 
     - **Request Cloaking**: Transforms requests to appear as Claude Code CLI
-    - **IP Obfuscation**: Optional WARP SOCKS5 proxy support
+    - **Outbound Proxy**: Optional HTTP/HTTPS outbound proxy for IP obfuscation
     - **Multi-Credential Management**: Store and switch between API credentials
     - **Admin Panel**: Web UI for management at `/admin/`
     - **Streaming Support**: Full SSE streaming with backpressure handling
+    - **Sensitive Word Filtering**: Aho-Corasick based single-pass obfuscation
     - **Parameter Normalization**: Automatically strips top_p/top_k to prevent upstream errors
 
     ## Configuration
 
-    After deployment, access the Admin Panel at `https://your-domain/admin/` using your `PROXY_KEY`.
+    After deployment, access the Admin Panel at `https://your-domain/admin/` using your `ADMIN_KEY`.
 
     ## Usage
 
     ```bash
     curl -X POST https://your-domain/v1/messages \
-      -H "Authorization: Bearer YOUR_PROXY_KEY" \
+      -H "Authorization: Bearer YOUR_ADMIN_KEY" \
       -H "Content-Type: application/json" \
       -d '{
         "model": "claude-sonnet-4-20250514",
@@ -55,10 +56,10 @@ spec:
       type: STRING
       name: API Key
       description: Upstream API credential
-    - key: PROXY_KEY
+    - key: ADMIN_KEY
       type: STRING
-      name: Proxy Key
-      description: Authentication key for accessing this proxy
+      name: Admin Key
+      description: Authentication key for accessing this proxy and admin panel
     - key: PUBLIC_DOMAIN
       type: DOMAIN
       name: Domain
@@ -79,14 +80,12 @@ spec:
           - id: data
             dir: /app/data
         env:
-          PASSWORD:
-            default: ""
           TARGET_URL:
             default: ${TARGET_URL}
           API_KEY:
             default: ${API_KEY}
-          PROXY_KEY:
-            default: ${PROXY_KEY}
+          ADMIN_KEY:
+            default: ${ADMIN_KEY}
           PORT:
             default: "4000"
           LOG_LEVEL:
@@ -95,10 +94,18 @@ spec:
             default: "true"
           NORMALIZE_PARAMS:
             default: "true"
+          REQUEST_TIMEOUT:
+            default: "60000"
+          TEST_REQUEST_TIMEOUT:
+            default: "15000"
+          OUTBOUND_PROXY:
+            default: ""
+          SENSITIVE_WORDS_MAX_ENTRIES:
+            default: "20000"
           CLI_VERSION:
-            default: "2.1.5"
+            default: "2.1.50"
           SDK_VERSION:
-            default: "0.71.2"
+            default: "0.72.1"
       domainKey: PUBLIC_DOMAIN
       instructions:
         - type: DOMAIN
@@ -109,7 +116,7 @@ spec:
           content: https://${PUBLIC_DOMAIN}/admin/
         - type: TEXT
           title: Authentication
-          content: Use your PROXY_KEY as Bearer token or x-api-key header
+          content: Use your ADMIN_KEY as Bearer token or x-api-key header
 
 localization:
   zh-CN:
@@ -121,9 +128,9 @@ localization:
       - key: API_KEY
         name: API 密钥
         description: 上游 API 凭证
-      - key: PROXY_KEY
-        name: 代理密钥
-        description: 访问此代理的认证密钥
+      - key: ADMIN_KEY
+        name: 管理密钥
+        description: 访问代理和管理面板的认证密钥
       - key: PUBLIC_DOMAIN
         name: 域名
         description: 服务的公开域名
@@ -135,21 +142,22 @@ localization:
       ## 功能特点
 
       - **请求伪装**：将请求转换为 Claude Code CLI 格式
-      - **IP 混淆**：可选的 WARP SOCKS5 代理支持
+      - **出口代理**：可选的 HTTP/HTTPS 出口代理，混淆源 IP
       - **多凭证管理**：存储和切换多个 API 凭证
       - **管理面板**：通过 `/admin/` 访问 Web 管理界面
-      - **流式支持**：完整的 SSE 流式传输
+      - **流式支持**：完整的 SSE 流式传输，支持背压处理
+      - **敏感词过滤**：基于 Aho-Corasick 的单次扫描替换
       - **参数规范化**：自动移除 top_p/top_k，防止上游错误
 
       ## 配置
 
-      部署后，使用 `PROXY_KEY` 访问管理面板 `https://your-domain/admin/`。
+      部署后，使用 `ADMIN_KEY` 访问管理面板 `https://your-domain/admin/`。
 
       ## 使用方法
 
       ```bash
       curl -X POST https://your-domain/v1/messages \
-        -H "Authorization: Bearer YOUR_PROXY_KEY" \
+        -H "Authorization: Bearer YOUR_ADMIN_KEY" \
         -H "Content-Type: application/json" \
         -d '{
           "model": "claude-sonnet-4-20250514",

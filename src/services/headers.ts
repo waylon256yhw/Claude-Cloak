@@ -1,4 +1,4 @@
-const CLI_VERSION = process.env.CLI_VERSION || '2.1.31'
+const CLI_VERSION = process.env.CLI_VERSION || '2.1.50'
 const SDK_VERSION = process.env.SDK_VERSION || '0.72.1'
 
 export function buildStealthHeaders(apiKey: string, stream = false): Record<string, string> {
