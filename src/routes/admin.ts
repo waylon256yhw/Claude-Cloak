@@ -11,6 +11,7 @@ import { settingsManager, type Settings } from '../settings/manager.js'
 import { sensitiveWordsManager } from '../sensitive-words/manager.js'
 import { modelManager } from '../models/manager.js'
 import { buildStealthHeaders } from '../services/headers.js'
+import { enhanceAnthropicRequest } from '../services/transform.js'
 import { resolveProxyUrl, proxyFetch } from '../services/proxy-fetch.js'
 
 interface IdParams {
@@ -139,15 +140,17 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
     const startTime = Date.now()
 
     try {
+      const testModel = modelManager.getTestModelId()
+      const testBody = await enhanceAnthropicRequest({
+        model: testModel,
+        max_tokens: 10,
+        stream: false,
+        messages: [{ role: 'user', content: 'Hi' }]
+      })
       const res = await proxyFetch(`${cred.targetUrl}/v1/messages`, {
         method: 'POST',
-        headers: buildStealthHeaders(cred.apiKey, false),
-        body: JSON.stringify({
-          model: modelManager.getTestModelId(),
-          max_tokens: 10,
-          stream: false,
-          messages: [{ role: 'user', content: 'Hi' }]
-        }),
+        headers: buildStealthHeaders(cred.apiKey, false, testModel),
+        body: JSON.stringify(testBody),
         signal: controller.signal
       }, resolveProxyUrl(cred.proxyUrl, config.outboundProxy))
 
@@ -158,12 +161,12 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
         return { success: true, latencyMs, statusCode: res.status }
       }
 
-      const data = await res.json().catch(() => ({})) as { error?: { type?: string; message?: string } }
+      const data = await res.json().catch(() => null)
       return {
         success: false,
         latencyMs,
         statusCode: res.status,
-        error: data.error || { message: `HTTP ${res.status}` }
+        error: data?.error ?? `HTTP ${res.status}`
       }
     } catch (err) {
       clearTimeout(timeout)

@@ -51,7 +51,7 @@ async function proxyToClaude(
   reply: FastifyReply
 ) {
   const isStream = body.stream === true
-  const headers = buildStealthHeaders(upstream.apiKey, isStream)
+  const headers = buildStealthHeaders(upstream.apiKey, isStream, body.model)
   const controller = new AbortController()
 
   const cleanup = () => controller.abort()
