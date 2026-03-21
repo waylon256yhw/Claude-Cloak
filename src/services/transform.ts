@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type {
   ClaudeRequest,
   ClaudeSystemBlock,
@@ -13,9 +14,32 @@ type LoggerLike = {
   warn?: (obj: unknown, msg?: string) => void
 }
 
+const BILLING_SALT = '59cf53e54c78'
+
 const CLAUDE_CODE_SYSTEM_PROMPT: ClaudeSystemBlock = {
   type: 'text',
   text: "You are Claude Code, Anthropic's official CLI for Claude.",
+}
+
+function extractFirstUserText(request: ClaudeRequest): string {
+  for (const msg of request.messages) {
+    if (msg.role !== 'user') continue
+    if (typeof msg.content === 'string') return msg.content
+    const text = msg.content
+      .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+      .map(b => b.text)
+      .join('')
+    if (text) return text
+  }
+  return ''
+}
+
+function computeBillingHeader(messageText: string): string {
+  const version = process.env.CLI_VERSION || '2.1.74'
+  const sampled = [4, 7, 20].map(i => messageText[i] ?? '0').join('')
+  const versionHash = createHash('sha256').update(`${BILLING_SALT}${sampled}${version}`).digest('hex').slice(0, 3)
+  const cch = createHash('sha256').update(messageText).digest('hex').slice(0, 5)
+  return `x-anthropic-billing-header: cc_version=${version}.${versionHash}; cc_entrypoint=cli; cch=${cch};`
 }
 
 function normalizeAnthropicParams(request: ClaudeRequest, logger?: LoggerLike): ClaudeRequest {
@@ -36,6 +60,9 @@ function normalizeAnthropicParams(request: ClaudeRequest, logger?: LoggerLike): 
 
 export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: LoggerLike, credential?: Credential): Promise<ClaudeRequest> {
   let enhanced = { ...request }
+
+  // Capture original text before any obfuscation for stable cch computation
+  const firstUserText = extractFirstUserText(enhanced)
 
   if (settingsManager.isStrictMode()) {
     enhanced.system = [CLAUDE_CODE_SYSTEM_PROMPT]
@@ -66,6 +93,13 @@ export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: L
       logger?.warn?.({ err }, 'Word obfuscation failed, continuing without obfuscation')
     }
   }
+
+  // Inject billing header last so obfuscation cannot touch it
+  const billingHeader: ClaudeSystemBlock = {
+    type: 'text',
+    text: computeBillingHeader(firstUserText),
+  }
+  enhanced.system = [billingHeader, ...(enhanced.system as ClaudeSystemBlock[])]
 
   return enhanced
 }
