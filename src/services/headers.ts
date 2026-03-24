@@ -1,4 +1,5 @@
-const CLI_VERSION = process.env.CLI_VERSION || '2.1.74'
+import { settingsManager } from '../settings/manager.js'
+
 const SDK_VERSION = process.env.SDK_VERSION || '0.78.0'
 
 function buildBetas(model?: string): string {
@@ -16,7 +17,7 @@ function buildBetas(model?: string): string {
 export function buildStealthHeaders(apiKey: string, stream = false, model?: string): Record<string, string> {
   const headers: Record<string, string> = {
     'Authorization': `Bearer ${apiKey}`,
-    'User-Agent': `claude-cli/${CLI_VERSION} (external, cli)`,
+    'User-Agent': `claude-cli/${settingsManager.getCliVersion()} (external, cli)`,
     'x-app': 'cli',
     'anthropic-version': '2023-06-01',
     'anthropic-beta': buildBetas(model),

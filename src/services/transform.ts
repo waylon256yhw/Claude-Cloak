@@ -35,7 +35,7 @@ function extractFirstUserText(request: ClaudeRequest): string {
 }
 
 function computeBillingHeader(messageText: string): string {
-  const version = process.env.CLI_VERSION || '2.1.74'
+  const version = settingsManager.getCliVersion()
   const sampled = [4, 7, 20].map(i => messageText[i] ?? '0').join('')
   const versionHash = createHash('sha256').update(`${BILLING_SALT}${sampled}${version}`).digest('hex').slice(0, 3)
   const cch = createHash('sha256').update(messageText).digest('hex').slice(0, 5)

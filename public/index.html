@@ -100,6 +100,20 @@
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <span class="setting-label">CLI Version</span>
+                            <span class="setting-desc">Claude CLI version for stealth headers</span>
+                        </div>
+                        <div class="cli-version-control">
+                            <div class="cli-version-input-group">
+                                <select id="cliVersionSelect" class="form-select cli-version-field"></select>
+                                <input type="text" id="cliVersionCustom" class="form-select cli-version-field hidden" placeholder="x.y.z">
+                                <button id="btnRefreshVersions" class="btn btn-secondary btn-icon" title="Refresh version list">&#x21bb;</button>
+                            </div>
+                            <span id="cliVersionSource" class="setting-hint"></span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="section-header" style="margin-top: 2.5rem;">

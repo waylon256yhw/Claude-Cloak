@@ -4,6 +4,7 @@ import { InvalidInputError } from '../utils/errors.js'
 export interface Settings {
   strictMode: boolean
   normalizeParameters: boolean
+  cliVersion: string
 }
 
 class SettingsManager {
@@ -14,6 +15,10 @@ class SettingsManager {
     this.settings = {
       strictMode: process.env.STRICT_MODE !== 'false',
       normalizeParameters: process.env.NORMALIZE_PARAMS !== 'false',
+      cliVersion: (() => {
+        const v = process.env.CLI_VERSION?.replace(/^v/, '')
+        return v && /^\d+\.\d+\.\d+$/.test(v) ? v : '2.1.80'
+      })(),
     }
   }
 
@@ -41,6 +46,10 @@ class SettingsManager {
     return this.settings.normalizeParameters
   }
 
+  getCliVersion(): string {
+    return this.settings.cliVersion
+  }
+
   async update(patch: Partial<Settings>): Promise<Settings> {
     if (patch.strictMode !== undefined) {
       if (typeof patch.strictMode !== 'boolean') {
@@ -53,6 +62,16 @@ class SettingsManager {
         throw new InvalidInputError('normalizeParameters must be a boolean')
       }
       this.settings.normalizeParameters = patch.normalizeParameters
+    }
+    if (patch.cliVersion !== undefined) {
+      if (typeof patch.cliVersion !== 'string') {
+        throw new InvalidInputError('cliVersion must be a string')
+      }
+      const cleaned = patch.cliVersion.replace(/^v/, '')
+      if (!/^\d+\.\d+\.\d+$/.test(cleaned)) {
+        throw new InvalidInputError('cliVersion must be a valid semver (x.y.z)')
+      }
+      this.settings.cliVersion = cleaned
     }
     await this.storage.write(this.settings)
     return this.getAll()

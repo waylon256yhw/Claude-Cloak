@@ -15,6 +15,10 @@ export class SettingsStorage extends JsonStore<Settings> {
     if (typeof raw.strictMode !== 'boolean' || typeof raw.normalizeParameters !== 'boolean') {
       return null
     }
-    return { strictMode: raw.strictMode, normalizeParameters: raw.normalizeParameters }
+    const envVersion = process.env.CLI_VERSION?.replace(/^v/, '')
+    const cliVersion = typeof raw.cliVersion === 'string' && /^\d+\.\d+\.\d+$/.test(raw.cliVersion)
+      ? raw.cliVersion
+      : (envVersion && /^\d+\.\d+\.\d+$/.test(envVersion) ? envVersion : '2.1.80')
+    return { strictMode: raw.strictMode, normalizeParameters: raw.normalizeParameters, cliVersion }
   }
 }

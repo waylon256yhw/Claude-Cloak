@@ -180,6 +180,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnLogout')?.addEventListener('click', () => logout('Logged out'));
     document.getElementById('strictModeToggle')?.addEventListener('change', toggleStrictMode);
     document.getElementById('normalizeParamsToggle')?.addEventListener('change', toggleNormalizeParams);
+    document.getElementById('btnRefreshVersions')?.addEventListener('click', refreshCliVersions);
+    document.getElementById('cliVersionSelect')?.addEventListener('change', onVersionSelectChange);
+    document.getElementById('cliVersionCustom')?.addEventListener('change', saveCliVersion);
     document.getElementById('quickGuideToggle')?.addEventListener('click', () => {
         document.getElementById('quickGuideCard').classList.toggle('collapsed');
     });
@@ -373,6 +376,7 @@ async function loadSettings() {
         if (toggle) toggle.checked = settings.strictMode;
         const normalizeToggle = document.getElementById('normalizeParamsToggle');
         if (normalizeToggle) normalizeToggle.checked = settings.normalizeParameters;
+        loadCliVersions(settings.cliVersion || '');
     } catch (e) {
         console.error('Failed to load settings:', e);
     }
@@ -395,6 +399,93 @@ async function toggleNormalizeParams(e) {
         showToast(`Parameter Normalization ${enabled ? 'enabled' : 'disabled'}`, 'success');
     } catch (err) {
         e.target.checked = !enabled;
+    }
+}
+
+function renderVersionSource(data) {
+    const hint = document.getElementById('cliVersionSource');
+    if (!hint) return;
+    if (data.source === 'github') {
+        const ago = data.fetchedAt ? Math.round((Date.now() - data.fetchedAt) / 60000) : 0;
+        hint.textContent = ago < 1 ? 'From GitHub (just now)' : `From GitHub (${ago}m ago)`;
+    } else if (data.source === 'cache') {
+        const ago = data.fetchedAt ? Math.round((Date.now() - data.fetchedAt) / 60000) : 0;
+        hint.textContent = `Cached (${ago}m ago)`;
+    } else {
+        hint.textContent = 'Bundled list (offline)';
+    }
+}
+
+function renderVersionSelect(versions, selected) {
+    const select = document.getElementById('cliVersionSelect');
+    const custom = document.getElementById('cliVersionCustom');
+    if (!select) return;
+    const inList = versions.includes(selected);
+    select.innerHTML = versions.map(v =>
+        `<option value="${v}"${v === selected ? ' selected' : ''}>${v}${v === selected ? ' (current)' : ''}</option>`
+    ).join('') + '<option value="__custom__">Custom...</option>';
+    if (!inList && selected) {
+        select.value = '__custom__';
+        if (custom) { custom.classList.remove('hidden'); custom.value = selected; }
+    } else {
+        if (custom) { custom.classList.add('hidden'); custom.value = ''; }
+    }
+}
+
+async function loadCliVersions(selected) {
+    try {
+        const data = await api('/cli-versions');
+        renderVersionSelect(data.versions, selected ?? data.selected);
+        renderVersionSource(data);
+    } catch (e) {
+        console.error('Failed to load CLI versions:', e);
+    }
+}
+
+function onVersionSelectChange(e) {
+    const custom = document.getElementById('cliVersionCustom');
+    if (e.target.value === '__custom__') {
+        if (custom) { custom.classList.remove('hidden'); custom.focus(); }
+        return;
+    }
+    if (custom) { custom.classList.add('hidden'); custom.value = ''; }
+    saveCliVersionValue(e.target.value);
+}
+
+async function refreshCliVersions() {
+    const btn = document.getElementById('btnRefreshVersions');
+    if (btn) btn.disabled = true;
+    try {
+        const data = await api('/cli-versions/refresh', { method: 'POST' });
+        renderVersionSelect(data.versions, data.selected);
+        renderVersionSource(data);
+        showToast('Version list refreshed', 'success');
+    } catch (e) {
+        // api() shows toast on error
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function saveCliVersion(e) {
+    const version = e.target.value.trim().replace(/^v/, '');
+    if (!/^\d+\.\d+\.\d+$/.test(version)) {
+        showToast('Invalid version format (expected x.y.z)', 'error');
+        return;
+    }
+    saveCliVersionValue(version);
+}
+
+async function saveCliVersionValue(version) {
+    try {
+        const settings = await api('/settings', {
+            method: 'PUT',
+            body: JSON.stringify({ cliVersion: version })
+        });
+        showToast(`CLI version set to ${settings.cliVersion}`, 'success');
+        loadCliVersions(settings.cliVersion);
+    } catch (e) {
+        // api() shows toast on error
     }
 }
 

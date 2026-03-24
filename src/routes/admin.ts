@@ -13,6 +13,7 @@ import { modelManager } from '../models/manager.js'
 import { buildStealthHeaders } from '../services/headers.js'
 import { enhanceAnthropicRequest } from '../services/transform.js'
 import { resolveProxyUrl, proxyFetch } from '../services/proxy-fetch.js'
+import { getAvailableVersions, refreshVersionCache } from '../services/cli-versions.js'
 
 interface IdParams {
   id: string
@@ -458,10 +459,23 @@ async function registerModelRoutes(fastify: FastifyInstance): Promise<void> {
   })
 }
 
+async function registerCliVersionRoutes(fastify: FastifyInstance): Promise<void> {
+  fastify.get('/cli-versions', async () => {
+    return getAvailableVersions(settingsManager.getCliVersion())
+  })
+
+  fastify.post('/cli-versions/refresh', async () => {
+    const { source } = await refreshVersionCache()
+    const result = await getAvailableVersions(settingsManager.getCliVersion())
+    return { ...result, source }
+  })
+}
+
 export async function adminRoutes(fastify: FastifyInstance, config: Config) {
   await registerCredentialRoutes(fastify, config)
   await registerApiKeyRoutes(fastify)
   await registerSettingsRoutes(fastify)
+  await registerCliVersionRoutes(fastify)
   await registerWordSetRoutes(fastify)
   await registerModelRoutes(fastify)
 }
