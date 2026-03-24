@@ -1,6 +1,6 @@
 import { settingsManager } from '../settings/manager.js'
 
-const SDK_VERSION = process.env.SDK_VERSION || '0.78.0'
+const SDK_VERSION = process.env.SDK_VERSION || '0.74.0'
 
 function buildBetas(model?: string): string {
   const betas: string[] = []
@@ -8,8 +8,10 @@ function buildBetas(model?: string): string {
 
   if (!isHaiku) betas.push('claude-code-20250219')
   betas.push('interleaved-thinking-2025-05-14')
+  betas.push('redact-thinking-2026-02-12')
   betas.push('context-management-2025-06-27')
   betas.push('prompt-caching-scope-2026-01-05')
+  betas.push('effort-2025-11-24')
 
   return betas.join(',')
 }
@@ -29,7 +31,7 @@ export function buildStealthHeaders(apiKey: string, stream = false, model?: stri
     'X-Stainless-OS': 'Linux',
     'X-Stainless-Arch': 'x64',
     'X-Stainless-Runtime': 'node',
-    'X-Stainless-Runtime-Version': 'v22.13.1',
+    'X-Stainless-Runtime-Version': 'v24.3.0',
     'X-Stainless-Retry-Count': '0',
     'X-Stainless-Timeout': '600',
   }

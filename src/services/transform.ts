@@ -81,6 +81,16 @@ export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: L
     enhanced.metadata.user_id = generateFakeUserId()
   }
 
+  const isHaiku = enhanced.model?.toLowerCase().includes('haiku') ?? false
+  if (!isHaiku) {
+    if (!enhanced.thinking) {
+      enhanced.thinking = { type: 'adaptive' }
+    }
+    if (!enhanced.output_config) {
+      enhanced.output_config = { effort: 'medium' }
+    }
+  }
+
   if (settingsManager.getNormalizeParameters()) {
     enhanced = normalizeAnthropicParams(enhanced, logger)
   }

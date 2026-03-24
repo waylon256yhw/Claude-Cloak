@@ -148,7 +148,7 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
         stream: false,
         messages: [{ role: 'user', content: 'Hi' }]
       })
-      const res = await proxyFetch(`${cred.targetUrl}/v1/messages`, {
+      const res = await proxyFetch(`${cred.targetUrl}/v1/messages?beta=true`, {
         method: 'POST',
         headers: buildStealthHeaders(cred.apiKey, false, testModel),
         body: JSON.stringify(testBody),

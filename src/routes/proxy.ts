@@ -62,7 +62,7 @@ async function proxyToClaude(
   const initialTimeout = setTimeout(() => controller.abort(), config.requestTimeout)
 
   try {
-    const response = await proxyFetch(`${upstream.targetUrl}/v1/messages`, {
+    const response = await proxyFetch(`${upstream.targetUrl}/v1/messages?beta=true`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
