@@ -14,3 +14,15 @@ export function isValidUserId(userId: string): boolean {
     return /^user_[a-fA-F0-9]{64}_account_/.test(userId)
   }
 }
+
+export function extractSessionId(userId: string): string | null {
+  try {
+    const parsed = JSON.parse(userId)
+    if (typeof parsed.session_id === 'string' && parsed.session_id.length > 0) {
+      return parsed.session_id
+    }
+  } catch {
+    /* fall through */
+  }
+  return null
+}

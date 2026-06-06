@@ -3,6 +3,7 @@ import type { Config, ClaudeRequest } from '../types.js'
 import type { Credential } from '../credentials/types.js'
 import { buildStealthHeaders } from '../services/headers.js'
 import { enhanceAnthropicRequest } from '../services/transform.js'
+import { extractSessionId } from '../services/user.js'
 import { pipeStream } from '../services/stream.js'
 import { credentialManager } from '../credentials/manager.js'
 import { resolveProxyUrl, proxyFetch } from '../services/proxy-fetch.js'
@@ -51,7 +52,8 @@ async function proxyToClaude(
   reply: FastifyReply
 ) {
   const isStream = body.stream === true
-  const headers = buildStealthHeaders(upstream.apiKey, isStream, body.model)
+  const sessionId = body.metadata?.user_id ? extractSessionId(body.metadata.user_id) ?? undefined : undefined
+  const headers = buildStealthHeaders(upstream.apiKey, isStream, body.model, sessionId)
   const controller = new AbortController()
 
   const cleanup = () => controller.abort()

@@ -96,8 +96,9 @@ docker run -d \
 - `CREDENTIAL_STORE_PATH` - 凭证存储路径（默认：`./data/credentials.json`）
 - `APIKEY_STORE_PATH` - API Key 存储路径（默认：`./data/apikeys.json`）
 - `SENSITIVE_WORDS_PATH` - 敏感词存储路径（默认：`./data/sensitive-words.json`）
-- `CLI_VERSION` - 伪装 CLI 版本头（默认：`2.1.31`）
-- `SDK_VERSION` - 伪装 SDK 版本头（默认：`0.72.1`）
+- `CLI_VERSION` - 伪装 CLI 版本头（默认：`2.1.167`）
+- `SDK_VERSION` - 伪装 Stainless SDK 包版本（默认：`0.94.0`）
+- `STAINLESS_OS` / `STAINLESS_ARCH` / `STAINLESS_RUNTIME` / `STAINLESS_RUNTIME_VERSION` - 覆盖自动探测的 Stainless 头
 
 ## 支持的客户端
 

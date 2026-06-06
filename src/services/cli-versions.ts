@@ -2,7 +2,7 @@ const GITHUB_RELEASES_URL = 'https://api.github.com/repos/anthropics/claude-code
 const FETCH_TIMEOUT = 5000
 const CACHE_TTL = 60 * 60 * 1000
 
-const BUNDLED_VERSIONS = ['2.1.81', '2.1.80', '2.1.77']
+const BUNDLED_VERSIONS = ['2.1.167', '2.1.166', '2.1.165']
 const SEMVER_RE = /^\d+\.\d+\.\d+$/
 
 interface VersionCache {

@@ -17,7 +17,7 @@ class SettingsManager {
       normalizeParameters: process.env.NORMALIZE_PARAMS !== 'false',
       cliVersion: (() => {
         const v = process.env.CLI_VERSION?.replace(/^v/, '')
-        return v && /^\d+\.\d+\.\d+$/.test(v) ? v : '2.1.80'
+        return v && /^\d+\.\d+\.\d+$/.test(v) ? v : '2.1.167'
       })(),
     }
   }

@@ -103,9 +103,9 @@ spec:
           SENSITIVE_WORDS_MAX_ENTRIES:
             default: "20000"
           CLI_VERSION:
-            default: "2.1.50"
+            default: "2.1.167"
           SDK_VERSION:
-            default: "0.72.1"
+            default: "0.94.0"
       domainKey: PUBLIC_DOMAIN
       instructions:
         - type: DOMAIN

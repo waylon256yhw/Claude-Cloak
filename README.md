@@ -97,8 +97,9 @@ For Zeabur, ClawCloud, Railway, and similar platforms:
 - `APIKEY_STORE_PATH` - API key storage path (default: `./data/apikeys.json`)
 - `SENSITIVE_WORDS_PATH` - Sensitive words storage path (default: `./data/sensitive-words.json`)
 - `OUTBOUND_PROXY` - Outbound proxy URL for upstream requests
-- `CLI_VERSION` - Spoofed CLI version header (default: `2.1.31`)
-- `SDK_VERSION` - Spoofed SDK version header (default: `0.72.1`)
+- `CLI_VERSION` - Spoofed CLI version header (default: `2.1.167`)
+- `SDK_VERSION` - Spoofed Stainless SDK package version (default: `0.94.0`)
+- `STAINLESS_OS` / `STAINLESS_ARCH` / `STAINLESS_RUNTIME` / `STAINLESS_RUNTIME_VERSION` - Override auto-detected Stainless headers
 
 ## Supported Clients
 
