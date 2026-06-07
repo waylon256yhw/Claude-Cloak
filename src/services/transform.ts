@@ -64,7 +64,11 @@ function normalizeAnthropicParams(request: ClaudeRequest, logger?: LoggerLike): 
     strippedKeys.push('top_p')
   }
 
-  if (normalized.thinking) {
+  // Opus 4.7+ returns 400 for any non-default temperature/top_k regardless of
+  // thinking; for other models we only strip them when thinking is on
+  // (thinking forbids deterministic sampling).
+  const stripTempK = !!normalized.thinking || isOpus47OrLater(normalized.model)
+  if (stripTempK) {
     if ('temperature' in normalized) {
       delete normalized.temperature
       strippedKeys.push('temperature')

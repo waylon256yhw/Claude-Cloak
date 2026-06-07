@@ -4,16 +4,15 @@ import { Mutex } from '../utils/mutex.js'
 import { NotFoundError, InvalidInputError } from '../utils/errors.js'
 
 const DEFAULT_MODELS: ModelEntry[] = [
-  { id: 'claude-opus-4-6', created: 1738713600 },
-  { id: 'claude-opus-4-5-20251101', created: 1730419200 },
-  { id: 'claude-sonnet-4-5-20250929', created: 1727568000 },
-  { id: 'claude-haiku-4-5-20251001', created: 1727740800 },
-  { id: 'claude-sonnet-4-20250514', created: 1715644800 },
-  { id: 'claude-opus-4-20250514', created: 1715644800 },
-  { id: 'claude-haiku-4-20250514', created: 1715644800 },
-  { id: 'claude-sonnet-3-7-20250219', created: 1739923200 },
-  { id: 'claude-sonnet-3-5-20241022', created: 1729555200 },
-  { id: 'claude-haiku-3-5-20241022', created: 1729555200 },
+  // Latest / recommended
+  { id: 'claude-opus-4-8',            created: 1779926400 }, // 2026-05-28
+  { id: 'claude-sonnet-4-6',          created: 1771286400 }, // 2026-02-17
+  { id: 'claude-haiku-4-5-20251001',  created: 1759276800 }, // 2025-10-01
+  // Active legacy
+  { id: 'claude-opus-4-7',            created: 1776297600 }, // 2026-04-16
+  { id: 'claude-opus-4-6',            created: 1770249600 }, // 2026-02-05
+  { id: 'claude-opus-4-5-20251101',   created: 1761955200 }, // 2025-11-01
+  { id: 'claude-sonnet-4-5-20250929', created: 1759104000 }, // 2025-09-29
 ]
 
 const DEFAULT_TEST_MODEL_ID = 'claude-haiku-4-5-20251001'
