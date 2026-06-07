@@ -79,7 +79,7 @@ export async function getAvailableVersions(currentVersion: string): Promise<CliV
   if (currentVersion && isValidCliVersion(currentVersion)) all.add(currentVersion)
 
   return {
-    versions: [...all].sort(compareSemver),
+    versions: [...all].toSorted(compareSemver),
     selected: currentVersion,
     source,
     fetchedAt: cache?.fetchedAt ?? null,

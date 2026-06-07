@@ -295,7 +295,7 @@ async function saveCredential(data) {
         showToast(`Credential ${isEdit ? 'updated' : 'added'} successfully`, 'success');
         closeModal();
         loadCredentials();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 }
 
 async function deleteCredential(id) {
@@ -310,7 +310,7 @@ async function deleteCredential(id) {
         await api(`/credentials/${id}`, { method: 'DELETE' });
         showToast('Credential deleted', 'success');
         loadCredentials();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 }
 
 async function toggleCredential(id, enabled) {
@@ -318,7 +318,7 @@ async function toggleCredential(id, enabled) {
         await api(`/credentials/${id}/toggle`, { method: 'POST', body: JSON.stringify({ enabled }) });
         showToast(`Credential ${enabled ? 'enabled' : 'disabled'}`, 'success');
         loadCredentials();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 }
 
 async function testCredential(btn, id) {
@@ -363,7 +363,7 @@ async function checkStatus() {
         } else {
             throw new Error();
         }
-    } catch (e) {
+    } catch {
         els.status.className = 'status-indicator error';
         els.status.querySelector('.status-text').textContent = 'System Offline';
     }
@@ -387,7 +387,7 @@ async function toggleStrictMode(e) {
     try {
         await api('/settings', { method: 'PUT', body: JSON.stringify({ strictMode: enabled }) });
         showToast(`Strict Mode ${enabled ? 'enabled' : 'disabled'}`, 'success');
-    } catch (err) {
+    } catch {
         e.target.checked = !enabled;
     }
 }
@@ -397,7 +397,7 @@ async function toggleNormalizeParams(e) {
     try {
         await api('/settings', { method: 'PUT', body: JSON.stringify({ normalizeParameters: enabled }) });
         showToast(`Parameter Normalization ${enabled ? 'enabled' : 'disabled'}`, 'success');
-    } catch (err) {
+    } catch {
         e.target.checked = !enabled;
     }
 }
@@ -460,7 +460,7 @@ async function refreshCliVersions() {
         renderVersionSelect(data.versions, data.selected);
         renderVersionSource(data);
         showToast('Version list refreshed', 'success');
-    } catch (e) {
+    } catch {
         // api() shows toast on error
     } finally {
         if (btn) btn.disabled = false;
@@ -484,7 +484,7 @@ async function saveCliVersionValue(version) {
         });
         showToast(`CLI version set to ${settings.cliVersion}`, 'success');
         loadCliVersions(settings.cliVersion);
-    } catch (e) {
+    } catch {
         // api() shows toast on error
     }
 }
@@ -722,7 +722,7 @@ function openWordsPopover(btn, credId) {
             // Re-open the popover on the new button since renderList() rebuilds DOM
             const newBtn = els.list.querySelector(`[data-action="words"][data-id="${credId}"]`);
             if (newBtn) openWordsPopover(newBtn, credId);
-        } catch (e) {
+        } catch {
             checkbox.checked = !checkbox.checked;
         }
     });
@@ -998,7 +998,7 @@ document.getElementById('wordSetNameForm')?.addEventListener('submit', async (e)
         }
         document.getElementById('wordSetNameModal').classList.add('hidden');
         loadWordSets();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 });
 
 async function renameWordSet(wsId) {
@@ -1029,7 +1029,7 @@ async function deleteWordSet(wsId) {
         delete wordsSearchQueries[wsId];
         loadWordSets();
         loadCredentials();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 }
 
 // --- WORD CRUD (scoped to word set) ---
@@ -1068,7 +1068,7 @@ document.getElementById('wordForm')?.addEventListener('submit', async (e) => {
         closeWordModal();
         loadWordSetWords(setId);
         loadWordSets();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 });
 
 async function deleteWord(wsId, wordId) {
@@ -1078,7 +1078,7 @@ async function deleteWord(wsId, wordId) {
         showToast('Word deleted', 'success');
         loadWordSetWords(wsId);
         loadWordSets();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 }
 
 async function clearWordSetWords(wsId) {
@@ -1093,7 +1093,7 @@ async function clearWordSetWords(wsId) {
         showToast(`Cleared ${result.cleared} words`, 'success');
         loadWordSetWords(wsId);
         loadWordSets();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 }
 
 // --- BATCH IMPORT (scoped to word set) ---
@@ -1127,7 +1127,7 @@ document.getElementById('importForm')?.addEventListener('submit', async (e) => {
         closeImportModal();
         loadWordSetWords(setId);
         loadWordSets();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 });
 
 // --- FALLBACK MODELS ---
@@ -1196,7 +1196,7 @@ async function addModel(id) {
         await api('/models', { method: 'POST', body: JSON.stringify({ id }) });
         showToast('Model added', 'success');
         loadModels();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 }
 
 async function deleteModel(id) {
@@ -1205,7 +1205,7 @@ async function deleteModel(id) {
         await api(`/models/${encodeURIComponent(id)}`, { method: 'DELETE' });
         showToast('Model deleted', 'success');
         loadModels();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 }
 
 async function resetModels() {
@@ -1218,7 +1218,7 @@ async function resetModels() {
         await api('/models/reset', { method: 'POST' });
         showToast('Models reset to defaults', 'success');
         loadModels();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 }
 
 async function changeTestModel(id) {
@@ -1226,7 +1226,7 @@ async function changeTestModel(id) {
         await api('/models/test-model', { method: 'PUT', body: JSON.stringify({ id }) });
         modelTestModelId = id;
         showToast('Test model updated', 'success');
-    } catch (e) {
+    } catch {
         renderTestModelSelect();
     }
 }
@@ -1363,7 +1363,7 @@ async function saveApiKey(data) {
             showToast('API key updated', 'success');
         }
         loadApiKeys();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 }
 
 async function deleteApiKey(id) {
@@ -1372,7 +1372,7 @@ async function deleteApiKey(id) {
         await api(`/apikeys/${id}`, { method: 'DELETE' });
         showToast('API key deleted', 'success');
         loadApiKeys();
-    } catch (e) { /* handled */ }
+    } catch { /* handled */ }
 }
 
 document.getElementById('btnAddApiKey')?.addEventListener('click', () => openApiKeyModal());

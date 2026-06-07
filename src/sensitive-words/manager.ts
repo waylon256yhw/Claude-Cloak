@@ -104,7 +104,7 @@ class SensitiveWordsManager {
   getMergedMatcher(wordSetIds: string[]): CompiledMatcher {
     if (wordSetIds.length === 0 || !this.store) return EMPTY_MATCHER
 
-    const sorted = [...wordSetIds].sort()
+    const sorted = [...wordSetIds].toSorted()
     const cacheKey = sorted.join('|')
 
     const cached = this.mergedMatcherCache.get(cacheKey)

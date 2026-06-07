@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "rules": {
+    "oxc/no-map-spread": "off",
+    "eslint/no-await-in-loop": "off",
+    "unicorn/prefer-add-event-listener": "off"
+  }
+}
