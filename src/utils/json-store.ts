@@ -27,7 +27,9 @@ export async function writeJsonFileAtomic(path: string, data: unknown, opts: Wri
     await fs.writeFile(tmp, payload, { mode: fileMode })
     await fs.rename(tmp, path)
   } catch (err) {
-    try { await fs.unlink(tmp) } catch {}
+    try {
+      await fs.unlink(tmp)
+    } catch {}
     throw err
   }
 }

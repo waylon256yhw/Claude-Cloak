@@ -33,7 +33,10 @@ export function createProxyAuthHook() {
   return async function proxyAuthHook(request: FastifyRequest, reply: FastifyReply) {
     const key = extractApiKey(request)
     if (!key) {
-      reply.code(401).send({ error: 'Unauthorized', message: 'Missing API key. Use Authorization: Bearer <key> or x-api-key header' })
+      reply.code(401).send({
+        error: 'Unauthorized',
+        message: 'Missing API key. Use Authorization: Bearer <key> or x-api-key header',
+      })
       return reply
     }
 

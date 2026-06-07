@@ -36,9 +36,10 @@ const PREVIEW_VISIBLE = 4
 
 export function maskApiKey(key: ApiKey, credentialName: string | null): ApiKeySafe {
   const rawKey = key.key
-  const preview = rawKey.length > KEY_PREFIX.length + PREVIEW_VISIBLE * 2
-    ? `${rawKey.slice(0, KEY_PREFIX.length + PREVIEW_VISIBLE)}...${rawKey.slice(-PREVIEW_VISIBLE)}`
-    : rawKey
+  const preview =
+    rawKey.length > KEY_PREFIX.length + PREVIEW_VISIBLE * 2
+      ? `${rawKey.slice(0, KEY_PREFIX.length + PREVIEW_VISIBLE)}...${rawKey.slice(-PREVIEW_VISIBLE)}`
+      : rawKey
   return {
     id: key.id,
     name: key.name,

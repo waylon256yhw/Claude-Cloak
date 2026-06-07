@@ -38,7 +38,10 @@ const fastify = Fastify({
 })
 
 fastify.addHook('onSend', async (_request, reply) => {
-  reply.header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'")
+  reply.header(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'"
+  )
   reply.header('X-Content-Type-Options', 'nosniff')
   reply.header('X-Frame-Options', 'DENY')
 })
@@ -52,10 +55,13 @@ await fastify.register(fastifyStatic, {
 })
 
 const adminAuthHook = createAdminAuthHook(config)
-await fastify.register(async (instance) => {
-  instance.addHook('preHandler', adminAuthHook)
-  await adminRoutes(instance, config)
-}, { prefix: '/admin/api' })
+await fastify.register(
+  async (instance) => {
+    instance.addHook('preHandler', adminAuthHook)
+    await adminRoutes(instance, config)
+  },
+  { prefix: '/admin/api' }
+)
 
 const proxyAuthHook = createProxyAuthHook()
 await fastify.register(async (instance) => {
@@ -68,12 +74,7 @@ fastify.setNotFoundHandler(async (request, reply) => {
   reply.code(404).send({
     error: 'Not Found',
     message: 'Endpoint not supported',
-    available_endpoints: [
-      'POST /v1/messages',
-      'GET /v1/models',
-      'GET /healthz',
-      'GET /admin/',
-    ],
+    available_endpoints: ['POST /v1/messages', 'GET /v1/models', 'GET /healthz', 'GET /admin/'],
   })
 })
 

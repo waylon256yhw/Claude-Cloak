@@ -1,10 +1,5 @@
 import { createHash } from 'node:crypto'
-import type {
-  ClaudeRequest,
-  ClaudeSystemBlock,
-  ClaudeMessage,
-  ClaudeContentBlock,
-} from '../types.js'
+import type { ClaudeRequest, ClaudeSystemBlock, ClaudeMessage, ClaudeContentBlock } from '../types.js'
 import type { Credential } from '../credentials/types.js'
 import { generateFakeUserId, isValidUserId } from './user.js'
 import { settingsManager } from '../settings/manager.js'
@@ -38,7 +33,7 @@ function extractFirstUserText(request: ClaudeRequest): string {
     if (typeof msg.content === 'string') return msg.content
     const text = msg.content
       .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
-      .map(b => b.text)
+      .map((b) => b.text)
       .join('')
     if (text) return text
   }
@@ -47,7 +42,7 @@ function extractFirstUserText(request: ClaudeRequest): string {
 
 function computeBillingHeader(messageText: string): string {
   const version = settingsManager.getCliVersion()
-  const sampled = [4, 7, 20].map(i => messageText[i] ?? '0').join('')
+  const sampled = [4, 7, 20].map((i) => messageText[i] ?? '0').join('')
   const versionHash = createHash('sha256').update(`${BILLING_SALT}${sampled}${version}`).digest('hex').slice(0, 3)
   // cch is the literal placeholder used by the real CLI's first-party path; relays
   // (monkeycoding etc.) recompute or whitelist this value, so any non-CLI value
@@ -80,7 +75,10 @@ function normalizeAnthropicParams(request: ClaudeRequest, logger?: LoggerLike): 
   }
 
   if (strippedKeys.length > 0) {
-    logger?.debug?.({ strippedKeys, model: normalized.model, thinking: normalized.thinking?.type }, 'Normalized API parameters')
+    logger?.debug?.(
+      { strippedKeys, model: normalized.model, thinking: normalized.thinking?.type },
+      'Normalized API parameters'
+    )
   }
 
   return normalized
@@ -95,7 +93,7 @@ function isBillingHeaderText(text: string): boolean {
 function hasNonEmptySystem(system: ClaudeRequest['system']): boolean {
   if (system == null) return false
   if (typeof system === 'string') return system.trim() !== ''
-  return system.some(b => b && b.type === 'text' && b.text.trim() !== '')
+  return system.some((b) => b && b.type === 'text' && b.text.trim() !== '')
 }
 
 function systemToText(system: ClaudeRequest['system']): string {
@@ -103,7 +101,7 @@ function systemToText(system: ClaudeRequest['system']): string {
   if (typeof system === 'string') return system
   return system
     .filter((b): b is ClaudeSystemBlock => !!b && b.type === 'text' && typeof b.text === 'string')
-    .map(b => b.text)
+    .map((b) => b.text)
     .join('\n\n')
 }
 
@@ -119,9 +117,7 @@ function stripBillingHeadersFromSystem(req: ClaudeRequest): ClaudeRequest {
   if (typeof req.system === 'string') {
     return isBillingHeaderText(req.system) ? { ...req, system: '' } : req
   }
-  const filtered = req.system.filter(
-    b => !(b && b.type === 'text' && isBillingHeaderText(b.text)),
-  )
+  const filtered = req.system.filter((b) => !(b && b.type === 'text' && isBillingHeaderText(b.text)))
   return { ...req, system: filtered }
 }
 
@@ -132,7 +128,7 @@ function dropEmptySystem(req: ClaudeRequest): ClaudeRequest {
 
 /** B3: strip empty text blocks; drop messages whose content drains to nothing. Other block kinds preserved. */
 function dropEmptyMessageTextBlocks(req: ClaudeRequest): ClaudeRequest {
-  const messages = req.messages.flatMap<ClaudeMessage>(m => {
+  const messages = req.messages.flatMap<ClaudeMessage>((m) => {
     if (typeof m.content === 'string') {
       return m.content.trim() === '' ? [] : [m]
     }
@@ -151,7 +147,11 @@ function fillSystemOnlyUserPlaceholder(req: ClaudeRequest): ClaudeRequest {
 
 // ---------- Main enhancer ----------
 
-export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: LoggerLike, credential?: Credential): Promise<ClaudeRequest> {
+export async function enhanceAnthropicRequest(
+  request: ClaudeRequest,
+  logger?: LoggerLike,
+  credential?: Credential
+): Promise<ClaudeRequest> {
   let enhanced: ClaudeRequest = { ...request }
 
   // 1-4: defensive cleanup of client input — before any stealth injection so we
@@ -171,10 +171,7 @@ export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: L
   if (settingsManager.isStrictMode() && hasNonEmptySystem(enhanced.system)) {
     const demoted = systemToText(enhanced.system).trim()
     if (demoted) {
-      enhanced.messages = [
-        { role: 'user', content: demoted },
-        ...enhanced.messages,
-      ]
+      enhanced.messages = [{ role: 'user', content: demoted }, ...enhanced.messages]
     }
     enhanced.system = [CLAUDE_CODE_SYSTEM_PROMPT]
   } else if (!enhanced.system || (Array.isArray(enhanced.system) && enhanced.system.length === 0)) {

@@ -31,14 +31,12 @@ export function obfuscateText(text: string, matcher: CompiledMatcher): string {
     if (startIdx < 0) continue
 
     const charStart = segments[startIdx].index
-    const charEnd = endIdx + 1 < segments.length
-      ? segments[endIdx + 1].index
-      : normalized.length
+    const charEnd = endIdx + 1 < segments.length ? segments[endIdx + 1].index : normalized.length
 
     reps.push({ charStart, charEnd })
   }
 
-  reps.sort((a, b) => a.charStart - b.charStart || (b.charEnd - b.charStart) - (a.charEnd - a.charStart))
+  reps.sort((a, b) => a.charStart - b.charStart || b.charEnd - b.charStart - (a.charEnd - a.charStart))
 
   let result = ''
   let pos = 0
@@ -69,10 +67,7 @@ function obfuscateRecursive(value: unknown, matcher: CompiledMatcher): unknown {
   return value
 }
 
-export function obfuscateAnthropicRequest(
-  request: ClaudeRequest,
-  matcher: CompiledMatcher
-): ClaudeRequest {
+export function obfuscateAnthropicRequest(request: ClaudeRequest, matcher: CompiledMatcher): ClaudeRequest {
   if (!matcher.ac) return request
 
   const result = { ...request }

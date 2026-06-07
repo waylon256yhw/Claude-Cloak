@@ -12,9 +12,7 @@ export async function readSettings(): Promise<Settings | null> {
   if (typeof raw.strictMode !== 'boolean' || typeof raw.normalizeParameters !== 'boolean') return null
   const stored = typeof raw.cliVersion === 'string' ? stripVersionPrefix(raw.cliVersion) : ''
   const envV = stripVersionPrefix(process.env.CLI_VERSION ?? '')
-  const cliVersion = isValidCliVersion(stored)
-    ? stored
-    : isValidCliVersion(envV) ? envV : DEFAULT_CLI_VERSION
+  const cliVersion = isValidCliVersion(stored) ? stored : isValidCliVersion(envV) ? envV : DEFAULT_CLI_VERSION
   return { strictMode: raw.strictMode, normalizeParameters: raw.normalizeParameters, cliVersion }
 }
 

@@ -28,7 +28,7 @@ async function proxyToClaude(
   reply: FastifyReply
 ) {
   const isStream = body.stream === true
-  const sessionId = body.metadata?.user_id ? extractSessionId(body.metadata.user_id) ?? undefined : undefined
+  const sessionId = body.metadata?.user_id ? (extractSessionId(body.metadata.user_id) ?? undefined) : undefined
   const headers = buildStealthHeaders(upstream.apiKey, isStream, body.model, sessionId, body)
   const controller = new AbortController()
 
@@ -40,12 +40,16 @@ async function proxyToClaude(
   const initialTimeout = setTimeout(() => controller.abort(), config.requestTimeout)
 
   try {
-    const response = await proxyFetch(`${upstream.targetUrl}/v1/messages?beta=true`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    }, resolveProxyUrl(upstream.proxyUrl, config.outboundProxy))
+    const response = await proxyFetch(
+      `${upstream.targetUrl}/v1/messages?beta=true`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      },
+      resolveProxyUrl(upstream.proxyUrl, config.outboundProxy)
+    )
 
     clearTimeout(initialTimeout)
 

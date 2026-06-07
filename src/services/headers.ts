@@ -61,17 +61,17 @@ export function buildStealthHeaders(
   stream = false,
   model?: string,
   sessionId?: string,
-  body?: ClaudeRequest,
+  body?: ClaudeRequest
 ): Record<string, string> {
   const headers: Record<string, string> = {
-    'Authorization': `Bearer ${apiKey}`,
+    Authorization: `Bearer ${apiKey}`,
     'User-Agent': `claude-cli/${settingsManager.getCliVersion()} (external, cli)`,
     'x-app': 'cli',
     'anthropic-version': '2023-06-01',
     'anthropic-beta': buildBetas(model, body),
     'anthropic-dangerous-direct-browser-access': 'true',
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    Accept: 'application/json',
     'X-Stainless-Lang': 'js',
     'X-Stainless-Package-Version': SDK_VERSION,
     'X-Stainless-OS': STAINLESS_OS,

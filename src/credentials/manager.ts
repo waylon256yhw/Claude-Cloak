@@ -56,10 +56,9 @@ export class CredentialManager {
         ...existing,
         name: input.name ?? existing.name,
         targetUrl: input.targetUrl ? validateTargetUrl(input.targetUrl) : existing.targetUrl,
-        apiKey: (input.apiKey && input.apiKey.trim()) ? input.apiKey.trim() : existing.apiKey,
-        proxyUrl: input.proxyUrl !== undefined
-          ? (input.proxyUrl ? validateProxyUrl(input.proxyUrl) : null)
-          : existing.proxyUrl,
+        apiKey: input.apiKey && input.apiKey.trim() ? input.apiKey.trim() : existing.apiKey,
+        proxyUrl:
+          input.proxyUrl !== undefined ? (input.proxyUrl ? validateProxyUrl(input.proxyUrl) : null) : existing.proxyUrl,
         updatedAt: new Date().toISOString(),
       }
       this.store.credentials[idx] = updated

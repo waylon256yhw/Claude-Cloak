@@ -43,11 +43,7 @@ export interface ClaudeToolResultBlock {
   is_error?: boolean
 }
 
-export type ClaudeContentBlock =
-  | ClaudeTextBlock
-  | ClaudeImageBlock
-  | ClaudeToolUseBlock
-  | ClaudeToolResultBlock
+export type ClaudeContentBlock = ClaudeTextBlock | ClaudeImageBlock | ClaudeToolUseBlock | ClaudeToolResultBlock
 
 export interface ClaudeMessage {
   role: 'user' | 'assistant'

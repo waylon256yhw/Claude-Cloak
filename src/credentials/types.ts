@@ -49,9 +49,7 @@ export function maskCredential(cred: Credential): CredentialSafe {
     id: cred.id,
     name: cred.name,
     targetUrl: cred.targetUrl,
-    keyMasked: keyLength >= MIN_KEY_LENGTH_FOR_MASKING
-      ? `...${cred.apiKey.slice(-VISIBLE_KEY_SUFFIX_LENGTH)}`
-      : '****',
+    keyMasked: keyLength >= MIN_KEY_LENGTH_FOR_MASKING ? `...${cred.apiKey.slice(-VISIBLE_KEY_SUFFIX_LENGTH)}` : '****',
     proxyUrl: cred.proxyUrl ? maskProxyUrl(cred.proxyUrl) : cred.proxyUrl,
     wordSetIds: cred.wordSetIds ?? [],
     enabled: cred.enabled,

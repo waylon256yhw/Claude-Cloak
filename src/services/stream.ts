@@ -14,7 +14,7 @@ export async function pipeStream(
   reply.raw.writeHead(response.status, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
+    Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
   })
 
@@ -62,7 +62,7 @@ export async function pipeStream(
             new Promise<void>((resolve) => {
               if (signal.aborted) resolve()
               else signal.addEventListener('abort', () => resolve(), { once: true })
-            })
+            }),
           ])
 
           // If connection closed/aborted during backpressure, stop streaming

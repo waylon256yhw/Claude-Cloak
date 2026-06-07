@@ -43,11 +43,11 @@ async function fetchLatestVersions(): Promise<string[]> {
   try {
     const res = await fetch(`${GITHUB_RELEASES_URL}?per_page=5`, {
       signal: controller.signal,
-      headers: { 'Accept': 'application/vnd.github+json' },
+      headers: { Accept: 'application/vnd.github+json' },
     })
     if (!res.ok) return []
-    const releases = await res.json() as Array<{ tag_name: string }>
-    return releases.map(r => stripVersionPrefix(r.tag_name)).filter(isValidCliVersion)
+    const releases = (await res.json()) as Array<{ tag_name: string }>
+    return releases.map((r) => stripVersionPrefix(r.tag_name)).filter(isValidCliVersion)
   } catch {
     return []
   } finally {
@@ -55,13 +55,17 @@ async function fetchLatestVersions(): Promise<string[]> {
   }
 }
 
-async function getOrFetchVersions(force: boolean): Promise<{ versions: string[]; source: 'github' | 'cache' | 'bundled' }> {
+async function getOrFetchVersions(
+  force: boolean
+): Promise<{ versions: string[]; source: 'github' | 'cache' | 'bundled' }> {
   if (!force && cache && Date.now() - cache.fetchedAt < CACHE_TTL) {
     return { versions: cache.versions, source: 'cache' }
   }
   if (force) inflight = null
   if (!inflight) {
-    inflight = fetchLatestVersions().finally(() => { inflight = null })
+    inflight = fetchLatestVersions().finally(() => {
+      inflight = null
+    })
   }
   const fetched = await inflight
   if (fetched.length > 0) {

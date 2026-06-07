@@ -18,20 +18,13 @@ export function validateHttpUrl(raw: string, label: string, opts?: ValidateUrlOp
   return opts?.stripTrailingSlash ? url.origin + url.pathname.replace(/\/+$/, '') : trimmed
 }
 
-export function resolveProxyUrl(
-  credentialProxy?: string | null,
-  globalProxy?: string | null,
-): string | undefined {
+export function resolveProxyUrl(credentialProxy?: string | null, globalProxy?: string | null): string | undefined {
   if (credentialProxy) return credentialProxy
   if (globalProxy) return globalProxy
   return undefined
 }
 
-export function proxyFetch(
-  url: string,
-  init: RequestInit,
-  proxyUrl?: string,
-): Promise<Response> {
+export function proxyFetch(url: string, init: RequestInit, proxyUrl?: string): Promise<Response> {
   if (proxyUrl) {
     return fetch(url, { ...init, proxy: proxyUrl } as RequestInit)
   }

@@ -13,10 +13,14 @@ export async function modelsRoutes(fastify: FastifyInstance, config: Config) {
     }
 
     try {
-      const response = await proxyFetch(`${upstream.targetUrl}/v1/models`, {
-        method: 'GET',
-        headers: buildStealthHeaders(upstream.apiKey),
-      }, resolveProxyUrl(upstream.proxyUrl, config.outboundProxy))
+      const response = await proxyFetch(
+        `${upstream.targetUrl}/v1/models`,
+        {
+          method: 'GET',
+          headers: buildStealthHeaders(upstream.apiKey),
+        },
+        resolveProxyUrl(upstream.proxyUrl, config.outboundProxy)
+      )
 
       if (response.ok) {
         const data = await response.text()
@@ -26,8 +30,7 @@ export async function modelsRoutes(fastify: FastifyInstance, config: Config) {
         })
         return reply.send(data)
       }
-    } catch {
-    }
+    } catch {}
 
     reply.headers({ 'X-Proxy-Status': 'fallback' })
     return reply.send(modelManager.getFallbackResponse())

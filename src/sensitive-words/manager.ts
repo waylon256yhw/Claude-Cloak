@@ -115,9 +115,7 @@ class SensitiveWordsManager {
       const set = this.store.sets.find((s) => s.id === id)
       if (set) matchers.push(this.getSetMatcher(set))
     }
-    const result = matchers.length === 0
-      ? EMPTY_MATCHER
-      : matchers.length === 1 ? matchers[0] : mergeMatchers(matchers)
+    const result = matchers.length === 0 ? EMPTY_MATCHER : matchers.length === 1 ? matchers[0] : mergeMatchers(matchers)
 
     this.mergedMatcherCache.set(cacheKey, result)
     for (const id of sorted) {
@@ -266,10 +264,16 @@ class SensitiveWordsManager {
         }
 
         const validated = this.validateWord(word)
-        if (!validated) { skipped++; continue }
+        if (!validated) {
+          skipped++
+          continue
+        }
 
         const normalized = this.normalizeForIndex(validated)
-        if (this.isDuplicateInSet(set, validated) || batchSeen.has(normalized)) { skipped++; continue }
+        if (this.isDuplicateInSet(set, validated) || batchSeen.has(normalized)) {
+          skipped++
+          continue
+        }
 
         batchSeen.add(normalized)
         set.entries.push({

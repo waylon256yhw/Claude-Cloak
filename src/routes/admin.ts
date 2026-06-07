@@ -63,7 +63,9 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
       return
     }
     if (looksLikeMaskedKey(apiKey)) {
-      reply.code(400).send({ error: 'Bad Request', message: 'Masked API key cannot be saved. Please provide the full key.' })
+      reply
+        .code(400)
+        .send({ error: 'Bad Request', message: 'Masked API key cannot be saved. Please provide the full key.' })
       return
     }
     try {
@@ -77,7 +79,10 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
   fastify.put<{ Params: IdParams; Body: UpdateCredentialInput }>('/credentials/:id', async (request, reply) => {
     const { apiKey } = request.body || {}
     if (apiKey && looksLikeMaskedKey(apiKey)) {
-      reply.code(400).send({ error: 'Bad Request', message: 'Masked API key cannot be saved. Please provide the full key or leave blank to keep existing.' })
+      reply.code(400).send({
+        error: 'Bad Request',
+        message: 'Masked API key cannot be saved. Please provide the full key or leave blank to keep existing.',
+      })
       return
     }
     try {
@@ -111,23 +116,26 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
     }
   })
 
-  fastify.put<{ Params: IdParams; Body: { wordSetIds: string[] } }>('/credentials/:id/word-sets', async (request, reply) => {
-    const { wordSetIds } = request.body || {}
-    if (!Array.isArray(wordSetIds) || !wordSetIds.every((id: unknown) => typeof id === 'string')) {
-      reply.code(400).send({ error: 'Bad Request', message: 'wordSetIds must be an array of strings' })
-      return
+  fastify.put<{ Params: IdParams; Body: { wordSetIds: string[] } }>(
+    '/credentials/:id/word-sets',
+    async (request, reply) => {
+      const { wordSetIds } = request.body || {}
+      if (!Array.isArray(wordSetIds) || !wordSetIds.every((id: unknown) => typeof id === 'string')) {
+        reply.code(400).send({ error: 'Bad Request', message: 'wordSetIds must be an array of strings' })
+        return
+      }
+      const unique = [...new Set(wordSetIds)]
+      const allSets = await sensitiveWordsManager.getAllSets()
+      const validIds = new Set(allSets.map((s) => s.id))
+      const filtered = unique.filter((id) => validIds.has(id))
+      try {
+        const cred = await credentialManager.setWordSetIds(request.params.id, filtered)
+        return maskCredential(cred)
+      } catch (err) {
+        handleCrudError(reply, err)
+      }
     }
-    const unique = [...new Set(wordSetIds)]
-    const allSets = await sensitiveWordsManager.getAllSets()
-    const validIds = new Set(allSets.map((s) => s.id))
-    const filtered = unique.filter((id) => validIds.has(id))
-    try {
-      const cred = await credentialManager.setWordSetIds(request.params.id, filtered)
-      return maskCredential(cred)
-    } catch (err) {
-      handleCrudError(reply, err)
-    }
-  })
+  )
 
   fastify.post<{ Params: IdParams }>('/credentials/:id/test', async (request, reply) => {
     const cred = credentialManager.getById(request.params.id)
@@ -146,14 +154,18 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
         model: testModel,
         max_tokens: 10,
         stream: false,
-        messages: [{ role: 'user', content: 'Hi' }]
+        messages: [{ role: 'user', content: 'Hi' }],
       })
-      const res = await proxyFetch(`${cred.targetUrl}/v1/messages?beta=true`, {
-        method: 'POST',
-        headers: buildStealthHeaders(cred.apiKey, false, testModel),
-        body: JSON.stringify(testBody),
-        signal: controller.signal
-      }, resolveProxyUrl(cred.proxyUrl, config.outboundProxy))
+      const res = await proxyFetch(
+        `${cred.targetUrl}/v1/messages?beta=true`,
+        {
+          method: 'POST',
+          headers: buildStealthHeaders(cred.apiKey, false, testModel),
+          body: JSON.stringify(testBody),
+          signal: controller.signal,
+        },
+        resolveProxyUrl(cred.proxyUrl, config.outboundProxy)
+      )
 
       clearTimeout(timeout)
       const latencyMs = Date.now() - startTime
@@ -167,7 +179,7 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
         success: false,
         latencyMs,
         statusCode: res.status,
-        error: data?.error ?? `HTTP ${res.status}`
+        error: data?.error ?? `HTTP ${res.status}`,
       }
     } catch (err) {
       clearTimeout(timeout)
@@ -178,7 +190,7 @@ async function registerCredentialRoutes(fastify: FastifyInstance, config: Config
         success: false,
         latencyMs,
         statusCode: isTimeout ? 504 : 502,
-        error: isTimeout ? 'Upstream request timed out' : (err as Error).message
+        error: isTimeout ? 'Upstream request timed out' : (err as Error).message,
       }
     }
   })
@@ -346,39 +358,47 @@ async function registerWordSetRoutes(fastify: FastifyInstance): Promise<void> {
     }
     const entry = await sensitiveWordsManager.addWord(request.params.id, word)
     if (!entry) {
-      reply.code(400).send({ error: 'Bad Request', message: 'Word set not found, word too short (min 2 chars), or already exists' })
+      reply
+        .code(400)
+        .send({ error: 'Bad Request', message: 'Word set not found, word too short (min 2 chars), or already exists' })
       return
     }
     return entry
   })
 
-  fastify.post<{ Params: IdParams; Body: { words: string[] } }>('/word-sets/:id/words/batch', async (request, reply) => {
-    const { words } = request.body || {}
-    if (!Array.isArray(words) || !words.every((w: unknown) => typeof w === 'string')) {
-      reply.code(400).send({ error: 'Bad Request', message: 'words must be an array of strings' })
-      return
+  fastify.post<{ Params: IdParams; Body: { words: string[] } }>(
+    '/word-sets/:id/words/batch',
+    async (request, reply) => {
+      const { words } = request.body || {}
+      if (!Array.isArray(words) || !words.every((w: unknown) => typeof w === 'string')) {
+        reply.code(400).send({ error: 'Bad Request', message: 'words must be an array of strings' })
+        return
+      }
+      const result = await sensitiveWordsManager.addWordBatch(request.params.id, words)
+      if (result === null) {
+        reply.code(404).send({ error: 'Not Found', message: 'Word set not found' })
+        return
+      }
+      return result
     }
-    const result = await sensitiveWordsManager.addWordBatch(request.params.id, words)
-    if (result === null) {
-      reply.code(404).send({ error: 'Not Found', message: 'Word set not found' })
-      return
-    }
-    return result
-  })
+  )
 
-  fastify.put<{ Params: WordIdParams; Body: { word: string } }>('/word-sets/:id/words/:wordId', async (request, reply) => {
-    const { word } = request.body || {}
-    if (!word || typeof word !== 'string') {
-      reply.code(400).send({ error: 'Bad Request', message: 'Missing required field: word' })
-      return
+  fastify.put<{ Params: WordIdParams; Body: { word: string } }>(
+    '/word-sets/:id/words/:wordId',
+    async (request, reply) => {
+      const { word } = request.body || {}
+      if (!word || typeof word !== 'string') {
+        reply.code(400).send({ error: 'Bad Request', message: 'Missing required field: word' })
+        return
+      }
+      const entry = await sensitiveWordsManager.updateWord(request.params.id, request.params.wordId, word)
+      if (!entry) {
+        reply.code(404).send({ error: 'Not Found', message: 'Word set or word not found, or invalid' })
+        return
+      }
+      return entry
     }
-    const entry = await sensitiveWordsManager.updateWord(request.params.id, request.params.wordId, word)
-    if (!entry) {
-      reply.code(404).send({ error: 'Not Found', message: 'Word set or word not found, or invalid' })
-      return
-    }
-    return entry
-  })
+  )
 
   fastify.delete<{ Params: WordIdParams }>('/word-sets/:id/words/:wordId', async (request, reply) => {
     const removed = await sensitiveWordsManager.removeWord(request.params.id, request.params.wordId)
