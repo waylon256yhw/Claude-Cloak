@@ -35,5 +35,5 @@ docs/
 # MCP tools
 .serena/
 
-# Scripts
-scripts/
+# Scripts (root-level only, so we don't shadow nested skill scripts/)
+/scripts/

@@ -53,7 +53,7 @@ async function proxyToClaude(
 ) {
   const isStream = body.stream === true
   const sessionId = body.metadata?.user_id ? extractSessionId(body.metadata.user_id) ?? undefined : undefined
-  const headers = buildStealthHeaders(upstream.apiKey, isStream, body.model, sessionId)
+  const headers = buildStealthHeaders(upstream.apiKey, isStream, body.model, sessionId, body)
   const controller = new AbortController()
 
   const cleanup = () => controller.abort()

@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto'
 import type {
   ClaudeRequest,
   ClaudeSystemBlock,
+  ClaudeMessage,
+  ClaudeContentBlock,
 } from '../types.js'
 import type { Credential } from '../credentials/types.js'
 import { generateFakeUserId, isValidUserId } from './user.js'
@@ -15,10 +17,19 @@ type LoggerLike = {
 }
 
 const BILLING_SALT = '59cf53e54c78'
+const BILLING_HEADER_PREFIX = 'x-anthropic-billing-header:'
 
 const CLAUDE_CODE_SYSTEM_PROMPT: ClaudeSystemBlock = {
   type: 'text',
   text: "You are Claude Code, Anthropic's official CLI for Claude.",
+}
+
+// Opus 4.7+ silently drops `budget_tokens` upstream, leaving the user with no
+// thinking at all. We rewrite to `adaptive` there to preserve intent.
+const OPUS_47_PLUS_RE = /^claude-opus-4-(7|8)(?:[-_]|$)/i
+
+function isOpus47OrLater(model: string | undefined): boolean {
+  return !!model && OPUS_47_PLUS_RE.test(model)
 }
 
 function extractFirstUserText(request: ClaudeRequest): string {
@@ -38,8 +49,10 @@ function computeBillingHeader(messageText: string): string {
   const version = settingsManager.getCliVersion()
   const sampled = [4, 7, 20].map(i => messageText[i] ?? '0').join('')
   const versionHash = createHash('sha256').update(`${BILLING_SALT}${sampled}${version}`).digest('hex').slice(0, 3)
-  const cch = createHash('sha256').update(messageText).digest('hex').slice(0, 5)
-  return `x-anthropic-billing-header: cc_version=${version}.${versionHash}; cc_entrypoint=cli; cch=${cch};`
+  // cch is the literal placeholder used by the real CLI's first-party path; relays
+  // (monkeycoding etc.) recompute or whitelist this value, so any non-CLI value
+  // gets rejected as "Client error, please upgrade your Claude Code client".
+  return `x-anthropic-billing-header: cc_version=${version}.${versionHash}; cc_entrypoint=cli; cch=00000;`
 }
 
 function normalizeAnthropicParams(request: ClaudeRequest, logger?: LoggerLike): ClaudeRequest {
@@ -69,21 +82,101 @@ function normalizeAnthropicParams(request: ClaudeRequest, logger?: LoggerLike): 
   return normalized
 }
 
-export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: LoggerLike, credential?: Credential): Promise<ClaudeRequest> {
-  let enhanced = { ...request }
+// ---------- Defensive cleanup helpers (ported from clewdr-hub) ----------
 
-  // Capture original text before any obfuscation for stable cch computation
+function isBillingHeaderText(text: string): boolean {
+  return text.trim().toLowerCase().startsWith(BILLING_HEADER_PREFIX)
+}
+
+function hasNonEmptySystem(system: ClaudeRequest['system']): boolean {
+  if (system == null) return false
+  if (typeof system === 'string') return system.trim() !== ''
+  return system.some(b => b && b.type === 'text' && b.text.trim() !== '')
+}
+
+function systemToText(system: ClaudeRequest['system']): string {
+  if (system == null) return ''
+  if (typeof system === 'string') return system
+  return system
+    .filter((b): b is ClaudeSystemBlock => !!b && b.type === 'text' && typeof b.text === 'string')
+    .map(b => b.text)
+    .join('\n\n')
+}
+
+function asSystemArray(system: ClaudeRequest['system']): ClaudeSystemBlock[] {
+  if (!system) return []
+  if (Array.isArray(system)) return system
+  return [{ type: 'text', text: String(system) }]
+}
+
+/** B1: drop any client-supplied billing-header blocks so our injection is idempotent. */
+function stripBillingHeadersFromSystem(req: ClaudeRequest): ClaudeRequest {
+  if (!req.system) return req
+  if (typeof req.system === 'string') {
+    return isBillingHeaderText(req.system) ? { ...req, system: '' } : req
+  }
+  const filtered = req.system.filter(
+    b => !(b && b.type === 'text' && isBillingHeaderText(b.text)),
+  )
+  return { ...req, system: filtered }
+}
+
+/** B2: clear an effectively-empty system so downstream branches see a clean None. */
+function dropEmptySystem(req: ClaudeRequest): ClaudeRequest {
+  return hasNonEmptySystem(req.system) ? req : { ...req, system: undefined }
+}
+
+/** B3: strip empty text blocks; drop messages whose content drains to nothing. Other block kinds preserved. */
+function dropEmptyMessageTextBlocks(req: ClaudeRequest): ClaudeRequest {
+  const messages = req.messages.flatMap<ClaudeMessage>(m => {
+    if (typeof m.content === 'string') {
+      return m.content.trim() === '' ? [] : [m]
+    }
+    const kept = m.content.filter((b: ClaudeContentBlock) => b.type !== 'text' || b.text.trim() !== '')
+    return kept.length === 0 ? [] : [{ ...m, content: kept }]
+  })
+  return { ...req, messages }
+}
+
+/** B4: zero-input safety net — if cleanup left only a system, inject a benign user turn. */
+function fillSystemOnlyUserPlaceholder(req: ClaudeRequest): ClaudeRequest {
+  if (req.messages.length > 0) return req
+  if (!hasNonEmptySystem(req.system)) return req
+  return { ...req, messages: [{ role: 'user', content: 'Continue.' }] }
+}
+
+// ---------- Main enhancer ----------
+
+export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: LoggerLike, credential?: Credential): Promise<ClaudeRequest> {
+  let enhanced: ClaudeRequest = { ...request }
+
+  // 1-4: defensive cleanup of client input — before any stealth injection so we
+  // sanitize first then add our own blocks.
+  enhanced = stripBillingHeadersFromSystem(enhanced)
+  enhanced = dropEmptySystem(enhanced)
+  enhanced = dropEmptyMessageTextBlocks(enhanced)
+  enhanced = fillSystemOnlyUserPlaceholder(enhanced)
+
+  // Capture original text before any obfuscation for stable cch sampling.
   const firstUserText = extractFirstUserText(enhanced)
 
-  if (settingsManager.isStrictMode()) {
+  // strictMode: relocate the user's system content into a leading user message
+  // so the wire-visible top-level `system` array contains only our CC identity
+  // (matching real CLI shape) while the user's intent survives in the
+  // conversation. Non-strict: prepend identity alongside the user's system.
+  if (settingsManager.isStrictMode() && hasNonEmptySystem(enhanced.system)) {
+    const demoted = systemToText(enhanced.system).trim()
+    if (demoted) {
+      enhanced.messages = [
+        { role: 'user', content: demoted },
+        ...enhanced.messages,
+      ]
+    }
     enhanced.system = [CLAUDE_CODE_SYSTEM_PROMPT]
-  } else if (!enhanced.system || enhanced.system.length === 0) {
+  } else if (!enhanced.system || (Array.isArray(enhanced.system) && enhanced.system.length === 0)) {
     enhanced.system = [CLAUDE_CODE_SYSTEM_PROMPT]
   } else {
-    const existingSystem = Array.isArray(enhanced.system)
-      ? enhanced.system
-      : [{ type: 'text' as const, text: String(enhanced.system) }]
-    enhanced.system = [CLAUDE_CODE_SYSTEM_PROMPT, ...existingSystem]
+    enhanced.system = [CLAUDE_CODE_SYSTEM_PROMPT, ...asSystemArray(enhanced.system)]
   }
 
   if (!enhanced.metadata) {
@@ -92,13 +185,17 @@ export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: L
     enhanced.metadata.user_id = generateFakeUserId()
   }
 
-  const isHaiku = enhanced.model?.toLowerCase().includes('haiku') ?? false
-  if (!isHaiku) {
-    if (!enhanced.thinking) {
-      enhanced.thinking = { type: 'adaptive' }
-    }
-    if (!enhanced.output_config) {
-      enhanced.output_config = { effort: 'medium' }
+  // Thinking handling: preserve user intent without inventing thinking config.
+  if (enhanced.thinking?.type === 'enabled') {
+    if (isOpus47OrLater(enhanced.model)) {
+      // Opus 4.7+ drops `budget_tokens` silently — rewrite so thinking actually fires.
+      enhanced.thinking = {
+        type: 'adaptive',
+        display: enhanced.thinking.display ?? 'summarized',
+      }
+    } else if (enhanced.thinking.display == null) {
+      // Otherwise: default display so the chain is visible to the client.
+      enhanced.thinking.display = 'summarized'
     }
   }
 
@@ -115,7 +212,7 @@ export async function enhanceAnthropicRequest(request: ClaudeRequest, logger?: L
     }
   }
 
-  // Inject billing header last so obfuscation cannot touch it
+  // Inject billing header last so obfuscation cannot touch it.
   const billingHeader: ClaudeSystemBlock = {
     type: 'text',
     text: computeBillingHeader(firstUserText),

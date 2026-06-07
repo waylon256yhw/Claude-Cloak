@@ -1,4 +1,5 @@
 import { settingsManager } from '../settings/manager.js'
+import type { ClaudeRequest } from '../types.js'
 
 const SDK_VERSION = process.env.SDK_VERSION || '0.94.0'
 
@@ -34,15 +35,23 @@ const STAINLESS_ARCH = process.env.STAINLESS_ARCH || detectStainlessArch()
 const STAINLESS_RUNTIME = process.env.STAINLESS_RUNTIME || 'node'
 const STAINLESS_RUNTIME_VERSION = process.env.STAINLESS_RUNTIME_VERSION || detectRuntimeVersion()
 
-function buildBetas(model?: string): string {
+// Body fields that require a matching anthropic-beta token. Without the token,
+// upstream rejects the field as "unknown" or "feature not enabled". We add
+// each token only when the client actually sent the corresponding field so
+// the header reflects real capability use, not invented capability claims.
+function buildBetas(model?: string, body?: ClaudeRequest): string {
   const betas: string[] = []
   const isHaiku = model?.toLowerCase().includes('haiku') ?? false
 
   if (!isHaiku) betas.push('claude-code-20250219')
   betas.push('interleaved-thinking-2025-05-14')
-  betas.push('redact-thinking-2026-02-12')
-  betas.push('context-management-2025-06-27')
-  betas.push('prompt-caching-scope-2026-01-05')
+
+  if (body?.context_management) betas.push('context-management-2025-06-27')
+  if (body?.output_config?.effort) betas.push('effort-2025-11-24')
+  // output_config.format is the structured-outputs entry point in 2026 CLI.
+  if ((body?.output_config as { format?: unknown } | undefined)?.format) {
+    betas.push('structured-outputs-2025-12-15')
+  }
 
   return betas.join(',')
 }
@@ -52,13 +61,14 @@ export function buildStealthHeaders(
   stream = false,
   model?: string,
   sessionId?: string,
+  body?: ClaudeRequest,
 ): Record<string, string> {
   const headers: Record<string, string> = {
     'Authorization': `Bearer ${apiKey}`,
     'User-Agent': `claude-cli/${settingsManager.getCliVersion()} (external, cli)`,
     'x-app': 'cli',
     'anthropic-version': '2023-06-01',
-    'anthropic-beta': buildBetas(model),
+    'anthropic-beta': buildBetas(model, body),
     'anthropic-dangerous-direct-browser-access': 'true',
     'Content-Type': 'application/json',
     'Accept': 'application/json',

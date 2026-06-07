@@ -71,8 +71,9 @@ export interface ClaudeRequest {
   messages: ClaudeMessage[]
   tools?: ClaudeTool[]
   metadata?: { user_id: string }
-  thinking?: { type: string; budget_tokens?: number }
+  thinking?: { type: string; budget_tokens?: number; display?: 'summarized' | 'omitted' }
   output_config?: { effort?: string }
+  context_management?: { edits: Array<{ type: string; keep?: string }> }
   temperature?: number
   top_p?: number
   top_k?: number
