@@ -1,4 +1,4 @@
-import { ModelStorage } from './storage.js'
+import { readModelStore, writeModelStore } from './storage.js'
 import type { ModelEntry, ModelStore } from './types.js'
 import { Mutex } from '../utils/mutex.js'
 import { NotFoundError, InvalidInputError } from '../utils/errors.js'
@@ -20,15 +20,10 @@ const DEFAULT_TEST_MODEL_ID = 'claude-haiku-4-5-20251001'
 
 export class ModelManager {
   private store: ModelStore = { entries: [], testModelId: DEFAULT_TEST_MODEL_ID, updatedAt: '' }
-  private storage: ModelStorage
   private mutex = new Mutex()
 
-  constructor(storage?: ModelStorage) {
-    this.storage = storage || new ModelStorage()
-  }
-
   async init(): Promise<void> {
-    const stored = await this.storage.read()
+    const stored = await readModelStore()
     if (stored) {
       this.store = stored
     } else {
@@ -37,12 +32,8 @@ export class ModelManager {
         testModelId: DEFAULT_TEST_MODEL_ID,
         updatedAt: new Date().toISOString(),
       }
-      await this.storage.write(this.store)
+      await writeModelStore(this.store)
     }
-  }
-
-  getAll(): ModelEntry[] {
-    return [...this.store.entries]
   }
 
   getStore(): ModelStore {
@@ -62,7 +53,7 @@ export class ModelManager {
       const entry: ModelEntry = { id, created: created ?? Math.floor(Date.now() / 1000) }
       this.store.entries.push(entry)
       this.store.updatedAt = new Date().toISOString()
-      await this.storage.write(this.store)
+      await writeModelStore(this.store)
       return entry
     } finally {
       this.mutex.release()
@@ -76,7 +67,7 @@ export class ModelManager {
       if (idx === -1) throw new NotFoundError('Model not found')
       this.store.entries.splice(idx, 1)
       this.store.updatedAt = new Date().toISOString()
-      await this.storage.write(this.store)
+      await writeModelStore(this.store)
     } finally {
       this.mutex.release()
     }
@@ -87,7 +78,7 @@ export class ModelManager {
     try {
       this.store.testModelId = id
       this.store.updatedAt = new Date().toISOString()
-      await this.storage.write(this.store)
+      await writeModelStore(this.store)
     } finally {
       this.mutex.release()
     }
@@ -101,7 +92,7 @@ export class ModelManager {
         testModelId: DEFAULT_TEST_MODEL_ID,
         updatedAt: new Date().toISOString(),
       }
-      await this.storage.write(this.store)
+      await writeModelStore(this.store)
     } finally {
       this.mutex.release()
     }

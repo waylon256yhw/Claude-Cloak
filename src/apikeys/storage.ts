@@ -1,18 +1,15 @@
 import { join } from 'node:path'
-import { JsonStore } from '../utils/json-store.js'
+import { readJsonFile, writeJsonFileAtomic } from '../utils/json-store.js'
 import type { ApiKeyStore } from './types.js'
 
-const DEFAULT_PATH = join(process.cwd(), 'data', 'apikeys.json')
+const PATH = process.env.APIKEY_STORE_PATH || join(process.cwd(), 'data', 'apikeys.json')
 
-export class ApiKeyStorage extends JsonStore<ApiKeyStore> {
-  constructor(path?: string) {
-    super(path || process.env.APIKEY_STORE_PATH || DEFAULT_PATH, {
-      fileMode: 0o600,
-      tmpPrefix: '.apikey-',
-    })
-  }
+export async function readApiKeyStore(): Promise<ApiKeyStore | null> {
+  const raw = await readJsonFile<Record<string, unknown>>(PATH)
+  if (!raw) return null
+  return { keys: Array.isArray(raw.keys) ? raw.keys : [] }
+}
 
-  protected deserialize(raw: Record<string, unknown>): ApiKeyStore {
-    return { keys: Array.isArray(raw.keys) ? raw.keys : [] }
-  }
+export async function writeApiKeyStore(store: ApiKeyStore): Promise<void> {
+  await writeJsonFileAtomic(PATH, store, { fileMode: 0o600, tmpPrefix: '.apikey-' })
 }

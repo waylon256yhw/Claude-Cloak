@@ -284,8 +284,7 @@ claude-cloak/
 │   ├── styles.css
 │   └── app.js
 ├── data/                   # Persistent storage (Docker volume)
-├── Dockerfile              # Bun runtime (default)
-├── Dockerfile.node         # Node.js fallback
+├── Dockerfile              # Bun runtime
 ├── docker-compose.yml      # Production (GHCR image)
 ├── docker-compose.dev.yml  # Development (local build)
 └── .env.example
@@ -300,17 +299,11 @@ bun install
 # Development mode (with hot reload)
 bun --watch src/server.ts
 
-# Build
-bun run build
-
 # Production
 bun start
 
-# Alternative: Use Node.js
-# Note: Outbound proxy (OUTBOUND_PROXY) is not available under Node.js
-npm install
-npm run build
-npm run start:node
+# Type-check only
+bun run typecheck
 ```
 
 ## Docker Deployment
@@ -337,18 +330,6 @@ APP_VERSION=$(git describe --tags) docker compose -f docker-compose.dev.yml up -
 APP_VERSION=v1.5.0 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-### Node.js Fallback
-
-If you encounter streaming issues with Bun, use the Node.js image:
-
-```bash
-docker build -f Dockerfile.node -t claude-cloak:node .
-docker run -d --name claude-cloak -p 4000:4000 \
-  -e ADMIN_KEY=your-secret \
-  -v ./data:/app/data \
-  claude-cloak:node
-```
-
 ### Docker Commands
 
 ```bash
@@ -361,7 +342,7 @@ docker compose pull           # Manual pull latest
 
 ## Tech Stack
 
-- **Runtime**: Bun (with Node.js fallback)
+- **Runtime**: Bun
 - **Framework**: Fastify 5
 - **Language**: TypeScript
 - **Container**: Docker + Alpine

@@ -1,7 +1,6 @@
-import { randomUUID } from 'node:crypto'
 import AhoCorasick from 'modern-ahocorasick'
 import type { SensitiveWordEntry, SensitiveWordSet, SensitiveWordSetsStore, CompiledMatcher } from './types.js'
-import { SensitiveWordsStorage, type MigrationInfo } from './storage.js'
+import { readSensitiveWordsStore, writeSensitiveWordsStore } from './storage.js'
 import { graphemeLength, containsZW, ZW } from './grapheme.js'
 import { Mutex } from '../utils/mutex.js'
 
@@ -54,7 +53,6 @@ function mergeMatchers(matchers: CompiledMatcher[]): CompiledMatcher {
 }
 
 class SensitiveWordsManager {
-  private storage = new SensitiveWordsStorage()
   private store: SensitiveWordSetsStore | null = null
   private initPromise: Promise<void> | null = null
   private mutex = new Mutex()
@@ -76,16 +74,12 @@ class SensitiveWordsManager {
   }
 
   private async load(): Promise<void> {
-    this.store = (await this.storage.read()) ?? { version: 2, sets: [] }
-  }
-
-  getMigrationInfo(): MigrationInfo {
-    return this.storage.getMigrationInfo()
+    this.store = (await readSensitiveWordsStore()) ?? { version: 2, sets: [] }
   }
 
   private async save(): Promise<void> {
     if (!this.store) return
-    await this.storage.write(this.store)
+    await writeSensitiveWordsStore(this.store)
   }
 
   private getSetMatcher(set: SensitiveWordSet): CompiledMatcher {
@@ -113,23 +107,19 @@ class SensitiveWordsManager {
     const sorted = [...wordSetIds].sort()
     const cacheKey = sorted.join('|')
 
-    let cached = this.mergedMatcherCache.get(cacheKey)
+    const cached = this.mergedMatcherCache.get(cacheKey)
     if (cached) return cached
 
-    if (sorted.length === 1) {
-      const set = this.store.sets.find((s) => s.id === sorted[0])
-      if (!set) return EMPTY_MATCHER
-      cached = this.getSetMatcher(set)
-    } else {
-      const matchers: CompiledMatcher[] = []
-      for (const id of sorted) {
-        const set = this.store.sets.find((s) => s.id === id)
-        if (set) matchers.push(this.getSetMatcher(set))
-      }
-      cached = matchers.length > 0 ? mergeMatchers(matchers) : EMPTY_MATCHER
+    const matchers: CompiledMatcher[] = []
+    for (const id of sorted) {
+      const set = this.store.sets.find((s) => s.id === id)
+      if (set) matchers.push(this.getSetMatcher(set))
     }
+    const result = matchers.length === 0
+      ? EMPTY_MATCHER
+      : matchers.length === 1 ? matchers[0] : mergeMatchers(matchers)
 
-    this.mergedMatcherCache.set(cacheKey, cached)
+    this.mergedMatcherCache.set(cacheKey, result)
     for (const id of sorted) {
       let keys = this.setIdToMergedKeys.get(id)
       if (!keys) {
@@ -139,7 +129,7 @@ class SensitiveWordsManager {
       keys.add(cacheKey)
     }
 
-    return cached
+    return result
   }
 
   // --- Word Set CRUD ---
@@ -160,7 +150,7 @@ class SensitiveWordsManager {
     try {
       await this.ensureLoaded()
       const set: SensitiveWordSet = {
-        id: randomUUID(),
+        id: Bun.randomUUIDv7(),
         name: name.trim(),
         entries: [],
         updatedAt: Date.now(),
@@ -243,7 +233,7 @@ class SensitiveWordsManager {
       if (this.isDuplicateInSet(set, validated)) return null
 
       const entry: SensitiveWordEntry = {
-        id: randomUUID(),
+        id: Bun.randomUUIDv7(),
         word: validated,
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -283,7 +273,7 @@ class SensitiveWordsManager {
 
         batchSeen.add(normalized)
         set.entries.push({
-          id: randomUUID(),
+          id: Bun.randomUUIDv7(),
           word: validated,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -360,13 +350,6 @@ class SensitiveWordsManager {
       return count
     } finally {
       this.mutex.release()
-    }
-  }
-
-  unbindWordSet(setId: string, credentials: { wordSetIds: string[] }[]): void {
-    for (const cred of credentials) {
-      const idx = cred.wordSetIds.indexOf(setId)
-      if (idx !== -1) cred.wordSetIds.splice(idx, 1)
     }
   }
 }

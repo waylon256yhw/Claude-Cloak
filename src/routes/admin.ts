@@ -258,11 +258,6 @@ async function registerSettingsRoutes(fastify: FastifyInstance): Promise<void> {
   })
 
   fastify.put<{ Body: Partial<Settings> }>('/settings', async (request, reply) => {
-    const { strictMode } = request.body || {}
-    if (strictMode !== undefined && typeof strictMode !== 'boolean') {
-      reply.code(400).send({ error: 'Bad Request', message: 'strictMode must be boolean' })
-      return
-    }
     try {
       return await settingsManager.update(request.body || {})
     } catch (err) {

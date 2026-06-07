@@ -1,5 +1,14 @@
-import { SettingsStorage } from './storage.js'
+import { readSettings, writeSettings } from './storage.js'
 import { InvalidInputError } from '../utils/errors.js'
+import { isValidCliVersion, stripVersionPrefix } from '../services/cli-versions.js'
+
+const DEFAULT_CLI_VERSION = '2.1.167'
+
+function normalizeCliVersion(raw: string | undefined): string | null {
+  if (!raw) return null
+  const cleaned = stripVersionPrefix(raw)
+  return isValidCliVersion(cleaned) ? cleaned : null
+}
 
 export interface Settings {
   strictMode: boolean
@@ -9,21 +18,17 @@ export interface Settings {
 
 class SettingsManager {
   private settings: Settings
-  private storage = new SettingsStorage()
 
   constructor() {
     this.settings = {
       strictMode: process.env.STRICT_MODE !== 'false',
       normalizeParameters: process.env.NORMALIZE_PARAMS !== 'false',
-      cliVersion: (() => {
-        const v = process.env.CLI_VERSION?.replace(/^v/, '')
-        return v && /^\d+\.\d+\.\d+$/.test(v) ? v : '2.1.167'
-      })(),
+      cliVersion: normalizeCliVersion(process.env.CLI_VERSION) ?? DEFAULT_CLI_VERSION,
     }
   }
 
   async init(): Promise<void> {
-    const stored = await this.storage.read()
+    const stored = await readSettings()
     if (stored) {
       this.settings = stored
     }
@@ -35,11 +40,6 @@ class SettingsManager {
 
   isStrictMode(): boolean {
     return this.settings.strictMode
-  }
-
-  async setStrictMode(value: boolean): Promise<void> {
-    this.settings.strictMode = value
-    await this.storage.write(this.settings)
   }
 
   getNormalizeParameters(): boolean {
@@ -67,13 +67,13 @@ class SettingsManager {
       if (typeof patch.cliVersion !== 'string') {
         throw new InvalidInputError('cliVersion must be a string')
       }
-      const cleaned = patch.cliVersion.replace(/^v/, '')
-      if (!/^\d+\.\d+\.\d+$/.test(cleaned)) {
+      const cleaned = normalizeCliVersion(patch.cliVersion)
+      if (!cleaned) {
         throw new InvalidInputError('cliVersion must be a valid semver (x.y.z)')
       }
       this.settings.cliVersion = cleaned
     }
-    await this.storage.write(this.settings)
+    await writeSettings(this.settings)
     return this.getAll()
   }
 }

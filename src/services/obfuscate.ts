@@ -1,5 +1,5 @@
 import type { CompiledMatcher } from '../sensitive-words/types.js'
-import type { ClaudeRequest, ClaudeMessage, ClaudeSystemBlock } from '../types.js'
+import type { ClaudeRequest, ClaudeMessage } from '../types.js'
 import { graphemes, segmentGraphemes } from '../sensitive-words/grapheme.js'
 
 function obfuscateMatch(m: string, zw: string): string {
@@ -52,62 +52,21 @@ export function obfuscateText(text: string, matcher: CompiledMatcher): string {
   return result
 }
 
-type ContentBlock = { type: string; text?: string; content?: unknown; [key: string]: unknown }
-
-function obfuscateContentRecursive(content: unknown, matcher: CompiledMatcher): unknown {
-  if (typeof content === 'string') {
-    return obfuscateText(content, matcher)
-  }
-
-  if (Array.isArray(content)) {
-    return content.map((item) => obfuscateContentRecursive(item, matcher))
-  }
-
-  if (content && typeof content === 'object') {
-    const block = content as ContentBlock
+function obfuscateRecursive(value: unknown, matcher: CompiledMatcher): unknown {
+  if (typeof value === 'string') return obfuscateText(value, matcher)
+  if (Array.isArray(value)) return value.map((item) => obfuscateRecursive(item, matcher))
+  if (value && typeof value === 'object') {
+    const block = value as Record<string, unknown> & { type?: string; text?: string; content?: unknown }
     const result: Record<string, unknown> = { ...block }
-
     if (block.type === 'text' && typeof block.text === 'string') {
       result.text = obfuscateText(block.text, matcher)
     }
-
     if ('content' in block && block.content !== undefined) {
-      result.content = obfuscateContentRecursive(block.content, matcher)
+      result.content = obfuscateRecursive(block.content, matcher)
     }
-
     return result
   }
-
-  return content
-}
-
-function obfuscateContent(
-  content: string | ContentBlock[],
-  matcher: CompiledMatcher
-): string | ContentBlock[] {
-  return obfuscateContentRecursive(content, matcher) as string | ContentBlock[]
-}
-
-function obfuscateSystem(
-  system: ClaudeSystemBlock[] | string | undefined,
-  matcher: CompiledMatcher
-): ClaudeSystemBlock[] | string | undefined {
-  if (!system) return system
-
-  if (typeof system === 'string') {
-    return obfuscateText(system, matcher)
-  }
-
-  if (Array.isArray(system)) {
-    return system.map((block) => {
-      if (block.type === 'text' && typeof block.text === 'string') {
-        return { ...block, text: obfuscateText(block.text, matcher) }
-      }
-      return block
-    })
-  }
-
-  return system
+  return value
 }
 
 export function obfuscateAnthropicRequest(
@@ -117,17 +76,14 @@ export function obfuscateAnthropicRequest(
   if (!matcher.ac) return request
 
   const result = { ...request }
-
   if (result.system) {
-    result.system = obfuscateSystem(result.system, matcher) as ClaudeSystemBlock[]
+    result.system = obfuscateRecursive(result.system, matcher) as ClaudeRequest['system']
   }
-
   if (result.messages) {
     result.messages = result.messages.map((msg: ClaudeMessage) => ({
       ...msg,
-      content: obfuscateContent(msg.content as string | ContentBlock[], matcher),
-    })) as ClaudeMessage[]
+      content: obfuscateRecursive(msg.content, matcher) as ClaudeMessage['content'],
+    }))
   }
-
   return result
 }

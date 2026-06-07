@@ -283,8 +283,7 @@ claude-cloak/
 │   ├── styles.css
 │   └── app.js
 ├── data/                   # 持久化存储（Docker 卷）
-├── Dockerfile              # Bun 运行时（默认）
-├── Dockerfile.node         # Node.js 回退
+├── Dockerfile              # Bun 运行时
 ├── docker-compose.yml
 └── .env.example
 ```
@@ -298,17 +297,11 @@ bun install
 # 开发模式（热重载）
 bun --watch src/server.ts
 
-# 构建
-bun run build
-
 # 生产运行
 bun start
 
-# 备选：使用 Node.js
-# 注意：出口代理（OUTBOUND_PROXY）在 Node.js 下不可用
-npm install
-npm run build
-npm run start:node
+# 仅类型检查
+bun run typecheck
 ```
 
 ## Docker 部署
@@ -329,18 +322,6 @@ docker compose up -d
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-### Node.js 回退
-
-如果遇到 Bun 流式传输问题，可使用 Node.js 镜像：
-
-```bash
-docker build -f Dockerfile.node -t claude-cloak:node .
-docker run -d --name claude-cloak -p 4000:4000 \
-  -e ADMIN_KEY=your-secret \
-  -v ./data:/app/data \
-  claude-cloak:node
-```
-
 ### Docker 命令
 
 ```bash
@@ -353,7 +334,7 @@ docker compose pull       # 手动拉取最新
 
 ## 技术栈
 
-- **运行时**：Bun（支持 Node.js 回退）
+- **运行时**：Bun
 - **框架**：Fastify 5
 - **语言**：TypeScript
 - **容器**：Docker + Alpine

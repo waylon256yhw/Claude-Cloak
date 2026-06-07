@@ -1,43 +1,22 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import type { Config } from '../types.js'
 import { buildStealthHeaders } from '../services/headers.js'
-import { credentialManager } from '../credentials/manager.js'
 import { modelManager } from '../models/manager.js'
 import { resolveProxyUrl, proxyFetch } from '../services/proxy-fetch.js'
+import { resolveUpstream } from '../services/upstream.js'
 
 export async function modelsRoutes(fastify: FastifyInstance, config: Config) {
   fastify.get('/v1/models', async (request: FastifyRequest, reply) => {
-    let targetUrl: string | null = null
-    let apiKey: string | null = null
-    let proxyUrl: string | null | undefined = undefined
-
-    const apiKeyEntity = request.apiKeyEntity
-    if (apiKeyEntity?.credentialId) {
-      const cred = credentialManager.getById(apiKeyEntity.credentialId)
-      if (cred?.enabled) {
-        targetUrl = cred.targetUrl
-        apiKey = cred.apiKey
-        proxyUrl = cred.proxyUrl
-      }
-    }
-
-    if (!targetUrl || !apiKey) {
-      targetUrl = config.targetUrl
-      apiKey = config.apiKey
-    }
-
-    if (!targetUrl || !apiKey) {
+    const upstream = resolveUpstream(request.apiKeyEntity, config)
+    if (!upstream) {
       return reply.send(modelManager.getFallbackResponse())
     }
 
-    const headers = buildStealthHeaders(apiKey)
-    const resolvedProxy = resolveProxyUrl(proxyUrl, config.outboundProxy)
-
     try {
-      const response = await proxyFetch(`${targetUrl}/v1/models`, {
+      const response = await proxyFetch(`${upstream.targetUrl}/v1/models`, {
         method: 'GET',
-        headers,
-      }, resolvedProxy)
+        headers: buildStealthHeaders(upstream.apiKey),
+      }, resolveProxyUrl(upstream.proxyUrl, config.outboundProxy))
 
       if (response.ok) {
         const data = await response.text()

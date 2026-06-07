@@ -12,13 +12,6 @@ export interface SensitiveWordSet {
   updatedAt: number
 }
 
-export interface SensitiveWordsStoreV1 {
-  version: 1
-  enabled: boolean
-  updatedAt: number
-  entries: SensitiveWordEntry[]
-}
-
 export interface SensitiveWordSetsStore {
   version: 2
   sets: SensitiveWordSet[]

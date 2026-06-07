@@ -1,10 +1,10 @@
 import type { Config } from './types.js'
-import { validateProxyUrl } from './services/proxy-fetch.js'
+import { validateHttpUrl } from './services/proxy-fetch.js'
 
 export function loadConfig(): Config {
   const outboundProxy = process.env.OUTBOUND_PROXY?.trim() || null
   if (outboundProxy) {
-    validateProxyUrl(outboundProxy)
+    validateHttpUrl(outboundProxy, 'proxy URL')
   }
 
   const adminKey = process.env.ADMIN_KEY || process.env.PROXY_KEY

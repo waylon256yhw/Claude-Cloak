@@ -1,24 +1,23 @@
 import { join } from 'node:path'
-import { JsonStore } from '../utils/json-store.js'
+import { readJsonFile, writeJsonFileAtomic } from '../utils/json-store.js'
+import { isValidCliVersion, stripVersionPrefix } from '../services/cli-versions.js'
 import type { Settings } from './manager.js'
 
-const DEFAULT_PATH = join(process.cwd(), 'data', 'settings.json')
+const PATH = process.env.SETTINGS_STORE_PATH || join(process.cwd(), 'data', 'settings.json')
+const DEFAULT_CLI_VERSION = '2.1.167'
 
-export class SettingsStorage extends JsonStore<Settings> {
-  constructor(path?: string) {
-    super(path || process.env.SETTINGS_STORE_PATH || DEFAULT_PATH, {
-      tmpPrefix: '.settings-',
-    })
-  }
+export async function readSettings(): Promise<Settings | null> {
+  const raw = await readJsonFile<Record<string, unknown>>(PATH)
+  if (!raw) return null
+  if (typeof raw.strictMode !== 'boolean' || typeof raw.normalizeParameters !== 'boolean') return null
+  const stored = typeof raw.cliVersion === 'string' ? stripVersionPrefix(raw.cliVersion) : ''
+  const envV = stripVersionPrefix(process.env.CLI_VERSION ?? '')
+  const cliVersion = isValidCliVersion(stored)
+    ? stored
+    : isValidCliVersion(envV) ? envV : DEFAULT_CLI_VERSION
+  return { strictMode: raw.strictMode, normalizeParameters: raw.normalizeParameters, cliVersion }
+}
 
-  protected deserialize(raw: Record<string, unknown>): Settings | null {
-    if (typeof raw.strictMode !== 'boolean' || typeof raw.normalizeParameters !== 'boolean') {
-      return null
-    }
-    const envVersion = process.env.CLI_VERSION?.replace(/^v/, '')
-    const cliVersion = typeof raw.cliVersion === 'string' && /^\d+\.\d+\.\d+$/.test(raw.cliVersion)
-      ? raw.cliVersion
-      : (envVersion && /^\d+\.\d+\.\d+$/.test(envVersion) ? envVersion : '2.1.167')
-    return { strictMode: raw.strictMode, normalizeParameters: raw.normalizeParameters, cliVersion }
-  }
+export async function writeSettings(settings: Settings): Promise<void> {
+  await writeJsonFileAtomic(PATH, settings, { tmpPrefix: '.settings-' })
 }

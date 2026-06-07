@@ -33,7 +33,6 @@ export interface CredentialSafe {
   name: string
   targetUrl: string
   keyMasked: string
-  keyLast4: string
   proxyUrl?: string | null
   wordSetIds: string[]
   enabled: boolean
@@ -46,15 +45,13 @@ const VISIBLE_KEY_SUFFIX_LENGTH = 4
 
 export function maskCredential(cred: Credential): CredentialSafe {
   const keyLength = cred.apiKey.length
-  const last4 = keyLength >= MIN_KEY_LENGTH_FOR_MASKING
-    ? cred.apiKey.slice(-VISIBLE_KEY_SUFFIX_LENGTH)
-    : ''
   return {
     id: cred.id,
     name: cred.name,
     targetUrl: cred.targetUrl,
-    keyMasked: keyLength >= MIN_KEY_LENGTH_FOR_MASKING ? `...${last4}` : '****',
-    keyLast4: last4,
+    keyMasked: keyLength >= MIN_KEY_LENGTH_FOR_MASKING
+      ? `...${cred.apiKey.slice(-VISIBLE_KEY_SUFFIX_LENGTH)}`
+      : '****',
     proxyUrl: cred.proxyUrl ? maskProxyUrl(cred.proxyUrl) : cred.proxyUrl,
     wordSetIds: cred.wordSetIds ?? [],
     enabled: cred.enabled,

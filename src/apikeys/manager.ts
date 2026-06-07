@@ -1,10 +1,9 @@
-import { randomUUID, randomBytes, timingSafeEqual } from 'node:crypto'
-import { ApiKeyStorage } from './storage.js'
-import type { ApiKey, ApiKeyStore, CreateApiKeyInput, UpdateApiKeyInput } from './types.js'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { readApiKeyStore, writeApiKeyStore } from './storage.js'
+import { KEY_PREFIX, type ApiKey, type ApiKeyStore, type CreateApiKeyInput, type UpdateApiKeyInput } from './types.js'
 import { Mutex } from '../utils/mutex.js'
 import { NotFoundError } from '../utils/errors.js'
 
-const KEY_PREFIX = 'cck-'
 const KEY_RANDOM_BYTES = 16
 
 function generateKey(): string {
@@ -13,23 +12,14 @@ function generateKey(): string {
 
 export class ApiKeyManager {
   private store: ApiKeyStore = { keys: [] }
-  private storage: ApiKeyStorage
   private mutex = new Mutex()
 
-  constructor(storage?: ApiKeyStorage) {
-    this.storage = storage || new ApiKeyStorage()
-  }
-
   async init(): Promise<void> {
-    this.store = (await this.storage.read()) ?? { keys: [] }
+    this.store = (await readApiKeyStore()) ?? { keys: [] }
   }
 
   getAll(): ApiKey[] {
     return [...this.store.keys]
-  }
-
-  getById(id: string): ApiKey | undefined {
-    return this.store.keys.find((k) => k.id === id)
   }
 
   resolve(rawKey: string): ApiKey | undefined {
@@ -53,7 +43,7 @@ export class ApiKeyManager {
 
       const now = new Date().toISOString()
       const apiKey: ApiKey = {
-        id: randomUUID(),
+        id: Bun.randomUUIDv7(),
         name: input.name,
         key,
         credentialId: input.credentialId ?? null,
@@ -61,7 +51,7 @@ export class ApiKeyManager {
         updatedAt: now,
       }
       this.store.keys.push(apiKey)
-      await this.storage.write(this.store)
+      await writeApiKeyStore(this.store)
       return apiKey
     } finally {
       this.mutex.release()
@@ -81,7 +71,7 @@ export class ApiKeyManager {
         updatedAt: new Date().toISOString(),
       }
       this.store.keys[idx] = updated
-      await this.storage.write(this.store)
+      await writeApiKeyStore(this.store)
       return updated
     } finally {
       this.mutex.release()
@@ -94,7 +84,7 @@ export class ApiKeyManager {
       const idx = this.store.keys.findIndex((k) => k.id === id)
       if (idx === -1) throw new NotFoundError('API key not found')
       this.store.keys.splice(idx, 1)
-      await this.storage.write(this.store)
+      await writeApiKeyStore(this.store)
     } finally {
       this.mutex.release()
     }

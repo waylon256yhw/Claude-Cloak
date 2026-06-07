@@ -1,44 +1,20 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import type { Config, ClaudeRequest } from '../types.js'
-import type { Credential } from '../credentials/types.js'
 import { buildStealthHeaders } from '../services/headers.js'
 import { enhanceAnthropicRequest } from '../services/transform.js'
 import { extractSessionId } from '../services/user.js'
 import { pipeStream } from '../services/stream.js'
-import { credentialManager } from '../credentials/manager.js'
 import { resolveProxyUrl, proxyFetch } from '../services/proxy-fetch.js'
-
-interface UpstreamConfig {
-  targetUrl: string
-  apiKey: string
-  proxyUrl?: string | null
-  credential?: Credential
-}
-
-function getUpstreamConfig(request: FastifyRequest, config: Config): UpstreamConfig {
-  const apiKeyEntity = request.apiKeyEntity
-  if (apiKeyEntity?.credentialId) {
-    const cred = credentialManager.getById(apiKeyEntity.credentialId)
-    if (cred?.enabled) {
-      return { targetUrl: cred.targetUrl, apiKey: cred.apiKey, proxyUrl: cred.proxyUrl, credential: cred }
-    }
-  }
-  if (config.targetUrl && config.apiKey) {
-    return { targetUrl: config.targetUrl, apiKey: config.apiKey }
-  }
-  throw new Error('No upstream credential configured')
-}
+import { resolveUpstream, type UpstreamConfig } from '../services/upstream.js'
 
 export async function proxyRoutes(fastify: FastifyInstance, config: Config) {
   fastify.post('/v1/messages', async (request: FastifyRequest, reply: FastifyReply) => {
-    const anthropicRequest = request.body as ClaudeRequest
-    let upstream: UpstreamConfig
-    try {
-      upstream = getUpstreamConfig(request, config)
-    } catch (err) {
-      reply.code(503).send({ error: 'Service Unavailable', message: (err as Error).message })
+    const upstream = resolveUpstream(request.apiKeyEntity, config)
+    if (!upstream) {
+      reply.code(503).send({ error: 'Service Unavailable', message: 'No upstream credential configured' })
       return
     }
+    const anthropicRequest = request.body as ClaudeRequest
     const enhancedRequest = await enhanceAnthropicRequest(anthropicRequest, request.log, upstream.credential)
     return proxyToClaude(config, upstream, enhancedRequest, request, reply)
   })

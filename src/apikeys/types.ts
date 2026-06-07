@@ -31,7 +31,7 @@ export interface UpdateApiKeyInput {
   credentialId?: string | null
 }
 
-const KEY_PREFIX = 'cck-'
+export const KEY_PREFIX = 'cck-'
 const PREVIEW_VISIBLE = 4
 
 export function maskApiKey(key: ApiKey, credentialName: string | null): ApiKeySafe {
